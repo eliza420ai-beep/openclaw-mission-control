@@ -20,20 +20,19 @@ class NotifyContext:
     changed_fields: dict | None = None
 
 
-def _employee_session_keys(session: Session, employee_ids: Iterable[int]) -> list[str]:
+def _employees_with_session_keys(session: Session, employee_ids: Iterable[int]) -> list[Employee]:
     ids = sorted({i for i in employee_ids if i is not None})
     if not ids:
         return []
 
     emps = session.exec(select(Employee).where(Employee.id.in_(ids))).all()
-    keys: list[str] = []
+    out: list[Employee] = []
     for e in emps:
         if not getattr(e, "notify_enabled", True):
             continue
-        sk = getattr(e, "openclaw_session_key", None)
-        if sk:
-            keys.append(sk)
-    return sorted(set(keys))
+        if getattr(e, "openclaw_session_key", None):
+            out.append(e)
+    return out
 
 
 def _project_pm_employee_ids(session: Session, project_id: int) -> set[int]:
@@ -86,12 +85,35 @@ def resolve_recipients(session: Session, ctx: NotifyContext) -> set[int]:
     return recipients
 
 
-def build_message(ctx: NotifyContext) -> str:
+def build_message(ctx: NotifyContext, recipient: Employee) -> str:
     t = ctx.task
     base = f"Task #{t.id}: {t.title}" if t.id is not None else f"Task: {t.title}"
 
+    # Agent-specific dispatch instructions. These notifications should result in the agent
+    # taking concrete actions in Mission Control, not just acknowledging.
+    if ctx.event in {"task.created", "task.assigned"} and recipient.employee_type == "agent":
+        desc = (t.description or "").strip()
+        if len(desc) > 500:
+            desc = desc[:497] + "..."
+        desc_block = f"\n\nDescription:\n{desc}" if desc else ""
+
+        # Keep this deterministic: agents already have base URL + header guidance in their prompt.
+        return (
+            f"{base}\n\n"
+            "You are the assignee. Start NOW:\n"
+            f"1) PATCH /tasks/{t.id} → status=in_progress (use X-Actor-Employee-Id: {recipient.id})\n"
+            f"2) POST /task-comments → task_id={t.id} with a 1-2 line plan + next action\n"
+            "3) Do the work\n"
+            "4) POST /task-comments → progress updates\n"
+            f"5) When complete: PATCH /tasks/{t.id} → status=done and post a final summary comment"
+            f"{desc_block}"
+        )
+
     if ctx.event == "task.assigned":
-        return f"Assigned: {base}.\nWork ONE task only; update Mission Control with a comment when you make progress."
+        return (
+            f"Assigned: {base}.\n"
+            "Work ONE task only; update Mission Control with a comment when you make progress."
+        )
 
     if ctx.event == "comment.created":
         snippet = ""
@@ -105,10 +127,16 @@ def build_message(ctx: NotifyContext) -> str:
         )
 
     if ctx.event == "status.changed":
-        return f"Status changed on {base} → {t.status}.\nWork ONE task only; update Mission Control with next step."
+        return (
+            f"Status changed on {base} → {t.status}.\n"
+            "Work ONE task only; update Mission Control with next step."
+        )
 
     if ctx.event == "task.created":
-        return f"New task created: {base}.\nWork ONE task only; add acceptance criteria / next step in Mission Control."
+        return (
+            f"New task created: {base}.\n"
+            "Work ONE task only; add acceptance criteria / next step in Mission Control."
+        )
 
     return f"Update on {base}.\nWork ONE task only; update Mission Control."
 
@@ -119,13 +147,16 @@ def notify_openclaw(session: Session, ctx: NotifyContext) -> None:
         return
 
     recipient_ids = resolve_recipients(session, ctx)
-    session_keys = _employee_session_keys(session, recipient_ids)
-    if not session_keys:
+    recipients = _employees_with_session_keys(session, recipient_ids)
+    if not recipients:
         return
 
-    message = build_message(ctx)
+    for e in recipients:
+        sk = getattr(e, "openclaw_session_key", None)
+        if not sk:
+            continue
 
-    for sk in session_keys:
+        message = build_message(ctx, recipient=e)
         try:
             client.tools_invoke(
                 "sessions_send",
