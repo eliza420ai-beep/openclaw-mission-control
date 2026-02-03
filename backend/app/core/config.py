@@ -22,8 +22,11 @@ class Settings(BaseSettings):
     # OpenClaw Gateway
     openclaw_gateway_url: str = ""
     openclaw_gateway_token: str = ""
+    openclaw_main_session_key: str = "agent:main:main"
+    openclaw_workspace_root: str = "~/.openclaw/workspaces"
 
     cors_origins: str = ""
+    base_url: str = ""
 
     # Database lifecycle
     db_auto_migrate: bool = False

@@ -20,11 +20,12 @@ from app.schemas.agents import (
     AgentUpdate,
 )
 from app.services.admin_access import require_admin
+from app.services.agent_provisioning import send_provisioning_message
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 OFFLINE_AFTER = timedelta(minutes=10)
-DEFAULT_GATEWAY_CHANNEL = "openclaw-agency"
+AGENT_SESSION_PREFIX = "agent"
 
 
 def _slugify(value: str) -> str:
@@ -32,17 +33,17 @@ def _slugify(value: str) -> str:
     return slug or uuid4().hex
 
 
-def _build_session_label(agent_name: str) -> str:
-    return f"{DEFAULT_GATEWAY_CHANNEL}-{_slugify(agent_name)}"
+def _build_session_key(agent_name: str) -> str:
+    return f"{AGENT_SESSION_PREFIX}:{_slugify(agent_name)}:main"
 
 
-async def _create_gateway_session(agent_name: str) -> str:
-    label = _build_session_label(agent_name)
+async def _ensure_gateway_session(agent_name: str) -> tuple[str, str | None]:
+    session_key = _build_session_key(agent_name)
     try:
-        await openclaw_call("sessions.patch", {"key": label, "label": agent_name})
+        await openclaw_call("sessions.patch", {"key": session_key, "label": agent_name})
+        return session_key, None
     except OpenClawGatewayError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return label
+        return session_key, str(exc)
 
 
 def _with_computed_status(agent: Agent) -> Agent:
@@ -79,18 +80,48 @@ async def create_agent(
 ) -> Agent:
     require_admin(auth)
     agent = Agent.model_validate(payload)
-    agent.openclaw_session_id = await _create_gateway_session(agent.name)
+    session_key, session_error = await _ensure_gateway_session(agent.name)
+    agent.openclaw_session_id = session_key
     session.add(agent)
     session.commit()
     session.refresh(agent)
-    session.add(
-        ActivityEvent(
-            event_type="agent.session.created",
-            message=f"Session created for {agent.name}.",
-            agent_id=agent.id,
+    if session_error:
+        session.add(
+            ActivityEvent(
+                event_type="agent.session.failed",
+                message=f"Session sync failed for {agent.name}: {session_error}",
+                agent_id=agent.id,
+            )
         )
-    )
+    else:
+        session.add(
+            ActivityEvent(
+                event_type="agent.session.created",
+                message=f"Session created for {agent.name}.",
+                agent_id=agent.id,
+            )
+        )
     session.commit()
+    try:
+        await send_provisioning_message(agent)
+    except OpenClawGatewayError as exc:
+        session.add(
+            ActivityEvent(
+                event_type="agent.provision.failed",
+                message=f"Provisioning message failed: {exc}",
+                agent_id=agent.id,
+            )
+        )
+        session.commit()
+    except Exception as exc:  # pragma: no cover - unexpected provisioning errors
+        session.add(
+            ActivityEvent(
+                event_type="agent.provision.failed",
+                message=f"Provisioning message failed: {exc}",
+                agent_id=agent.id,
+            )
+        )
+        session.commit()
     return agent
 
 
@@ -160,26 +191,88 @@ async def heartbeat_or_create_agent(
     agent = session.exec(select(Agent).where(Agent.name == payload.name)).first()
     if agent is None:
         agent = Agent(name=payload.name, status=payload.status or "online")
-        agent.openclaw_session_id = await _create_gateway_session(agent.name)
+        session_key, session_error = await _ensure_gateway_session(agent.name)
+        agent.openclaw_session_id = session_key
         session.add(agent)
         session.commit()
         session.refresh(agent)
-        session.add(
-            ActivityEvent(
-                event_type="agent.session.created",
-                message=f"Session created for {agent.name}.",
-                agent_id=agent.id,
+        if session_error:
+            session.add(
+                ActivityEvent(
+                    event_type="agent.session.failed",
+                    message=f"Session sync failed for {agent.name}: {session_error}",
+                    agent_id=agent.id,
+                )
             )
-        )
+        else:
+            session.add(
+                ActivityEvent(
+                    event_type="agent.session.created",
+                    message=f"Session created for {agent.name}.",
+                    agent_id=agent.id,
+                )
+            )
+        session.commit()
+        try:
+            await send_provisioning_message(agent)
+        except OpenClawGatewayError as exc:
+            session.add(
+                ActivityEvent(
+                    event_type="agent.provision.failed",
+                    message=f"Provisioning message failed: {exc}",
+                    agent_id=agent.id,
+                )
+            )
+            session.commit()
+        except Exception as exc:  # pragma: no cover - unexpected provisioning errors
+            session.add(
+                ActivityEvent(
+                    event_type="agent.provision.failed",
+                    message=f"Provisioning message failed: {exc}",
+                    agent_id=agent.id,
+                )
+            )
+            session.commit()
     elif not agent.openclaw_session_id:
-        agent.openclaw_session_id = await _create_gateway_session(agent.name)
-        session.add(
-            ActivityEvent(
-                event_type="agent.session.created",
-                message=f"Session created for {agent.name}.",
-                agent_id=agent.id,
+        session_key, session_error = await _ensure_gateway_session(agent.name)
+        agent.openclaw_session_id = session_key
+        if session_error:
+            session.add(
+                ActivityEvent(
+                    event_type="agent.session.failed",
+                    message=f"Session sync failed for {agent.name}: {session_error}",
+                    agent_id=agent.id,
+                )
             )
-        )
+        else:
+            session.add(
+                ActivityEvent(
+                    event_type="agent.session.created",
+                    message=f"Session created for {agent.name}.",
+                    agent_id=agent.id,
+                )
+            )
+        session.commit()
+        try:
+            await send_provisioning_message(agent)
+        except OpenClawGatewayError as exc:
+            session.add(
+                ActivityEvent(
+                    event_type="agent.provision.failed",
+                    message=f"Provisioning message failed: {exc}",
+                    agent_id=agent.id,
+                )
+            )
+            session.commit()
+        except Exception as exc:  # pragma: no cover - unexpected provisioning errors
+            session.add(
+                ActivityEvent(
+                    event_type="agent.provision.failed",
+                    message=f"Provisioning message failed: {exc}",
+                    agent_id=agent.id,
+                )
+            )
+            session.commit()
     if payload.status:
         agent.status = payload.status
     agent.last_seen_at = datetime.utcnow()
