@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
-import { MessageSquare, Pencil, Settings, X } from "lucide-react";
+import { Activity, MessageSquare, Pencil, Settings, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
@@ -146,6 +146,7 @@ export default function BoardDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [comments, setComments] = useState<TaskComment[]>([]);
+  const [liveFeed, setLiveFeed] = useState<TaskComment[]>([]);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
@@ -174,6 +175,16 @@ export default function BoardDetailPage() {
   const [isDeletingTask, setIsDeletingTask] = useState(false);
   const [deleteTaskError, setDeleteTaskError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
+  const [isLiveFeedOpen, setIsLiveFeedOpen] = useState(false);
+  const pushLiveFeed = useCallback((comment: TaskComment) => {
+    setLiveFeed((prev) => {
+      if (prev.some((item) => item.id === comment.id)) {
+        return prev;
+      }
+      const next = [comment, ...prev];
+      return next.slice(0, 50);
+    });
+  }, []);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -634,6 +645,7 @@ export default function BoardDetailPage() {
                   comment?: TaskComment;
                 };
                 if (payload.comment?.task_id && payload.type === "task.comment") {
+                  pushLiveFeed(payload.comment as TaskComment);
                   setComments((prev) => {
                     if (selectedTask?.id !== payload.comment?.task_id) {
                       return prev;
@@ -674,7 +686,7 @@ export default function BoardDetailPage() {
       isCancelled = true;
       abortController.abort();
     };
-  }, [board, boardId, getToken, isSignedIn, selectedTask?.id]);
+  }, [board, boardId, getToken, isSignedIn, selectedTask?.id, pushLiveFeed]);
 
   useEffect(() => {
     if (!isSignedIn || !boardId) return;
@@ -869,6 +881,22 @@ export default function BoardDetailPage() {
     return map;
   }, [agents, boardId]);
 
+  const taskTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    tasks.forEach((task) => {
+      map.set(task.id, task.title);
+    });
+    return map;
+  }, [tasks]);
+
+  const orderedLiveFeed = useMemo(() => {
+    return [...liveFeed].sort((a, b) => {
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return bTime - aTime;
+    });
+  }, [liveFeed]);
+
   const pendingApprovalsByTaskId = useMemo(() => {
     const map = new Map<string, number>();
     approvals
@@ -1008,6 +1036,7 @@ export default function BoardDetailPage() {
 
   const openComments = (task: Task) => {
     setIsChatOpen(false);
+    setIsLiveFeedOpen(false);
     setSelectedTask(task);
     setIsDetailOpen(true);
     void loadComments(task.id);
@@ -1027,12 +1056,27 @@ export default function BoardDetailPage() {
     if (isDetailOpen) {
       closeComments();
     }
+    setIsLiveFeedOpen(false);
     setIsChatOpen(true);
   };
 
   const closeBoardChat = () => {
     setIsChatOpen(false);
     setChatError(null);
+  };
+
+  const openLiveFeed = () => {
+    if (isDetailOpen) {
+      closeComments();
+    }
+    if (isChatOpen) {
+      closeBoardChat();
+    }
+    setIsLiveFeedOpen(true);
+  };
+
+  const closeLiveFeed = () => {
+    setIsLiveFeedOpen(false);
   };
 
   const handlePostComment = async () => {
@@ -1453,10 +1497,20 @@ export default function BoardDetailPage() {
                   <Button
                     variant="outline"
                     onClick={openBoardChat}
-                    className="gap-2"
+                    className="h-9 w-9 p-0"
+                    aria-label="Board chat"
+                    title="Board chat"
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Board chat
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={openLiveFeed}
+                    className="h-9 w-9 p-0"
+                    aria-label="Live feed"
+                    title="Live feed"
+                  >
+                    <Activity className="h-4 w-4" />
                   </Button>
                   <button
                     type="button"
@@ -1649,12 +1703,14 @@ export default function BoardDetailPage() {
           </div>
         </main>
       </SignedIn>
-      {isDetailOpen || isChatOpen ? (
+      {isDetailOpen || isChatOpen || isLiveFeedOpen ? (
         <div
           className="fixed inset-0 z-40 bg-slate-900/20"
           onClick={() => {
             if (isChatOpen) {
               closeBoardChat();
+            } else if (isLiveFeedOpen) {
+              closeLiveFeed();
             } else {
               closeComments();
             }
@@ -2022,6 +2078,95 @@ export default function BoardDetailPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      </aside>
+
+      <aside
+        className={cn(
+          "fixed right-0 top-0 z-50 h-full w-[520px] max-w-[96vw] transform border-l border-slate-200 bg-white shadow-2xl transition-transform",
+          isLiveFeedOpen ? "translate-x-0" : "translate-x-full",
+        )}
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Live feed
+              </p>
+              <p className="mt-1 text-sm font-medium text-slate-900">
+                Realtime task comments across this board.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeLiveFeed}
+              className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+              aria-label="Close live feed"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {orderedLiveFeed.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Waiting for new comments…
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {orderedLiveFeed.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-slate-700">
+                          {comment.task_id
+                            ? taskTitleById.get(comment.task_id) ?? "Task"
+                            : "Task"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {comment.agent_id
+                            ? assigneeById.get(comment.agent_id) ?? "Agent"
+                            : "Admin"}
+                        </p>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        {formatCommentTimestamp(comment.created_at)}
+                      </span>
+                    </div>
+                    {comment.message?.trim() ? (
+                      <div className="mt-2 text-xs text-slate-900">
+                        <ReactMarkdown
+                          components={{
+                            p: ({ ...props }) => (
+                              <p className="mb-2 last:mb-0" {...props} />
+                            ),
+                            ul: ({ ...props }) => (
+                              <ul className="mb-2 list-disc pl-5" {...props} />
+                            ),
+                            ol: ({ ...props }) => (
+                              <ol className="mb-2 list-decimal pl-5" {...props} />
+                            ),
+                            li: ({ ...props }) => (
+                              <li className="mb-1" {...props} />
+                            ),
+                            strong: ({ ...props }) => (
+                              <strong className="font-semibold" {...props} />
+                            ),
+                          }}
+                        >
+                          {comment.message}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-500">—</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </aside>
