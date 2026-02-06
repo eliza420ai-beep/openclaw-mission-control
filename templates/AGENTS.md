@@ -31,6 +31,17 @@ Write things down. Do not rely on short-term context.
 - HEARTBEAT.md defines what to do on each heartbeat.
 - Follow it exactly.
 
+## Collaboration (mandatory)
+- You are one of multiple agents on a board. Act like a team, not a silo.
+- The assigned agent is the DRI for a task. Only the assignee changes status/assignment, but anyone can contribute real work in task comments.
+- Task comments are the primary channel for agent-to-agent collaboration.
+- Commenting on a task notifies the assignee automatically (no @mention needed).
+- Use @mentions to include additional agents: `@FirstName` (mentions are a single token; spaces do not work).
+- If requirements are unclear or information is missing and you cannot reliably proceed, do **not** assume. Ask the board lead for clarity by tagging them.
+  - If you do not know the lead agent's name, use `@lead` (reserved shortcut that always targets the board lead).
+- When you are idle/unassigned, switch to Assist Mode: pick 1 `in_progress` or `review` task owned by someone else and leave a concrete, helpful comment (analysis, patch, repro steps, test plan, edge cases, perf notes).
+- Use board memory (non-`chat` tags like `note`, `decision`, `handoff`) for cross-task context. Do not put task status updates there.
+
 ## Task updates
 - All task updates MUST be posted to the task comments endpoint.
 - Do not post task updates in chat/web channels under any circumstance.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
@@ -168,6 +168,178 @@ const MARKDOWN_TABLE_COMPONENTS: Components = {
   ),
 };
 
+const MARKDOWN_COMPONENTS_BASIC: Components = {
+  ...MARKDOWN_TABLE_COMPONENTS,
+  p: ({ node: _node, className, ...props }) => (
+    <p className={cn("mb-2 last:mb-0", className)} {...props} />
+  ),
+  ul: ({ node: _node, className, ...props }) => (
+    <ul className={cn("mb-2 list-disc pl-5", className)} {...props} />
+  ),
+  ol: ({ node: _node, className, ...props }) => (
+    <ol className={cn("mb-2 list-decimal pl-5", className)} {...props} />
+  ),
+  li: ({ node: _node, className, ...props }) => (
+    <li className={cn("mb-1", className)} {...props} />
+  ),
+  strong: ({ node: _node, className, ...props }) => (
+    <strong className={cn("font-semibold", className)} {...props} />
+  ),
+};
+
+const MARKDOWN_COMPONENTS_DESCRIPTION: Components = {
+  ...MARKDOWN_COMPONENTS_BASIC,
+  p: ({ node: _node, className, ...props }) => (
+    <p className={cn("mb-3 last:mb-0", className)} {...props} />
+  ),
+  h1: ({ node: _node, className, ...props }) => (
+    <h1 className={cn("mb-2 text-base font-semibold", className)} {...props} />
+  ),
+  h2: ({ node: _node, className, ...props }) => (
+    <h2 className={cn("mb-2 text-sm font-semibold", className)} {...props} />
+  ),
+  h3: ({ node: _node, className, ...props }) => (
+    <h3 className={cn("mb-2 text-sm font-semibold", className)} {...props} />
+  ),
+  code: ({ node: _node, className, ...props }) => (
+    <code
+      className={cn("rounded bg-slate-100 px-1 py-0.5 text-xs", className)}
+      {...props}
+    />
+  ),
+  pre: ({ node: _node, className, ...props }) => (
+    <pre
+      className={cn(
+        "overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100",
+        className,
+      )}
+      {...props}
+    />
+  ),
+};
+
+const MARKDOWN_REMARK_PLUGINS_BASIC = [remarkGfm];
+const MARKDOWN_REMARK_PLUGINS_WITH_BREAKS = [remarkGfm, remarkBreaks];
+
+type MarkdownVariant = "basic" | "comment" | "description";
+
+const Markdown = memo(function Markdown({
+  content,
+  variant,
+}: {
+  content: string;
+  variant: MarkdownVariant;
+}) {
+  const trimmed = content.trim();
+  const remarkPlugins =
+    variant === "comment"
+      ? MARKDOWN_REMARK_PLUGINS_WITH_BREAKS
+      : MARKDOWN_REMARK_PLUGINS_BASIC;
+  const components =
+    variant === "description" ? MARKDOWN_COMPONENTS_DESCRIPTION : MARKDOWN_COMPONENTS_BASIC;
+  return (
+    <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
+      {trimmed}
+    </ReactMarkdown>
+  );
+});
+
+Markdown.displayName = "Markdown";
+
+const formatShortTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const TaskCommentCard = memo(function TaskCommentCard({
+  comment,
+  authorLabel,
+}: {
+  comment: TaskComment;
+  authorLabel: string;
+}) {
+  const message = (comment.message ?? "").trim();
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>{authorLabel}</span>
+        <span>{formatShortTimestamp(comment.created_at)}</span>
+      </div>
+      {message ? (
+        <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-slate-900 break-words">
+          <Markdown content={message} variant="comment" />
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-slate-900">—</p>
+      )}
+    </div>
+  );
+});
+
+TaskCommentCard.displayName = "TaskCommentCard";
+
+const ChatMessageCard = memo(function ChatMessageCard({
+  message,
+}: {
+  message: BoardChatMessage;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-900">{message.source ?? "User"}</p>
+        <span className="text-xs text-slate-400">
+          {formatShortTimestamp(message.created_at)}
+        </span>
+      </div>
+      <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-slate-900 break-words">
+        <Markdown content={message.content} variant="basic" />
+      </div>
+    </div>
+  );
+});
+
+ChatMessageCard.displayName = "ChatMessageCard";
+
+const LiveFeedCard = memo(function LiveFeedCard({
+  comment,
+  taskTitle,
+  authorLabel,
+}: {
+  comment: TaskComment;
+  taskTitle: string;
+  authorLabel: string;
+}) {
+  const message = (comment.message ?? "").trim();
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
+        <div className="min-w-0">
+          <p className="truncate text-xs font-semibold text-slate-700">{taskTitle}</p>
+          <p className="mt-1 text-[11px] text-slate-400">{authorLabel}</p>
+        </div>
+        <span className="text-[11px] text-slate-400">
+          {formatShortTimestamp(comment.created_at)}
+        </span>
+      </div>
+      {message ? (
+        <div className="mt-2 select-text cursor-text text-xs leading-relaxed text-slate-900 break-words">
+          <Markdown content={message} variant="basic" />
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-slate-500">—</p>
+      )}
+    </div>
+  );
+});
+
+LiveFeedCard.displayName = "LiveFeedCard";
+
 export default function BoardDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -181,6 +353,7 @@ export default function BoardDetailPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const selectedTaskIdRef = useRef<string | null>(null);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [liveFeed, setLiveFeed] = useState<TaskComment[]>([]);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
@@ -351,6 +524,10 @@ export default function BoardDetailPage() {
   useEffect(() => {
     agentsRef.current = agents;
   }, [agents]);
+
+  useEffect(() => {
+    selectedTaskIdRef.current = selectedTask?.id ?? null;
+  }, [selectedTask?.id]);
 
   useEffect(() => {
     chatMessagesRef.current = chatMessages;
@@ -691,14 +868,30 @@ export default function BoardDetailPage() {
                 if (payload.comment?.task_id && payload.type === "task.comment") {
                   pushLiveFeed(payload.comment);
                   setComments((prev) => {
-                    if (selectedTask?.id !== payload.comment?.task_id) {
+                    if (selectedTaskIdRef.current !== payload.comment?.task_id) {
                       return prev;
                     }
                     const exists = prev.some((item) => item.id === payload.comment?.id);
                     if (exists) {
                       return prev;
                     }
-                    return [...prev, payload.comment as TaskComment];
+                    const createdAt = payload.comment?.created_at;
+                    const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+                    if (prev.length === 0 || Number.isNaN(createdMs)) {
+                      return [...prev, payload.comment as TaskComment];
+                    }
+                    const last = prev[prev.length - 1];
+                    const lastMs = last?.created_at ? new Date(last.created_at).getTime() : NaN;
+                    if (!Number.isNaN(lastMs) && createdMs >= lastMs) {
+                      return [...prev, payload.comment as TaskComment];
+                    }
+                    const next = [...prev, payload.comment as TaskComment];
+                    next.sort((a, b) => {
+                      const aTime = new Date(a.created_at).getTime();
+                      const bTime = new Date(b.created_at).getTime();
+                      return aTime - bTime;
+                    });
+                    return next;
                   });
                 } else if (payload.task) {
                   setTasks((prev) => {
@@ -766,7 +959,7 @@ export default function BoardDetailPage() {
         window.clearTimeout(reconnectTimeout);
       }
     };
-  }, [board, boardId, isSignedIn, selectedTask?.id, pushLiveFeed]);
+  }, [board, boardId, isSignedIn, pushLiveFeed]);
 
   useEffect(() => {
     if (!isSignedIn || !boardId) return;
@@ -1007,14 +1200,6 @@ export default function BoardDetailPage() {
     selectedTask,
   ]);
 
-  const orderedComments = useMemo(() => {
-    return [...comments].sort((a, b) => {
-      const aTime = new Date(a.created_at).getTime();
-      const bTime = new Date(b.created_at).getTime();
-      return bTime - aTime;
-    });
-  }, [comments]);
-
   const pendingApprovals = useMemo(
     () => approvals.filter((approval) => approval.status === "pending"),
     [approvals],
@@ -1061,7 +1246,13 @@ export default function BoardDetailPage() {
           taskId,
         );
       if (result.status !== 200) throw new Error("Unable to load comments.");
-      setComments(result.data.items ?? []);
+      const items = [...(result.data.items ?? [])];
+      items.sort((a, b) => {
+        const aTime = new Date(a.created_at).getTime();
+        const bTime = new Date(b.created_at).getTime();
+        return aTime - bTime;
+      });
+      setComments(items);
     } catch (err) {
       setCommentsError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -1074,6 +1265,7 @@ export default function BoardDetailPage() {
     setIsLiveFeedOpen(false);
     const fullTask = tasksRef.current.find((item) => item.id === task.id);
     if (!fullTask) return;
+    selectedTaskIdRef.current = fullTask.id;
     setSelectedTask(fullTask);
     setIsDetailOpen(true);
     void loadComments(task.id);
@@ -1081,6 +1273,7 @@ export default function BoardDetailPage() {
 
   const closeComments = () => {
     setIsDetailOpen(false);
+    selectedTaskIdRef.current = null;
     setSelectedTask(null);
     setComments([]);
     setCommentsError(null);
@@ -1311,17 +1504,6 @@ export default function BoardDetailPage() {
     if (agent.is_board_lead) return "Board lead";
     if (agent.is_gateway_main) return "Gateway main";
     return "Agent";
-  };
-
-  const formatCommentTimestamp = (value: string) => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const formatTaskTimestamp = (value?: string | null) => {
@@ -1792,44 +1974,7 @@ export default function BoardDetailPage() {
               </p>
               {selectedTask?.description ? (
                 <div className="prose prose-sm max-w-none text-slate-700">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      ...MARKDOWN_TABLE_COMPONENTS,
-                      p: ({ node: _node, ...props }) => (
-                        <p className="mb-3 last:mb-0" {...props} />
-                      ),
-                      ul: ({ node: _node, ...props }) => (
-                        <ul className="mb-3 list-disc pl-5" {...props} />
-                      ),
-                      ol: ({ node: _node, ...props }) => (
-                        <ol className="mb-3 list-decimal pl-5" {...props} />
-                      ),
-                      li: ({ node: _node, ...props }) => (
-                        <li className="mb-1" {...props} />
-                      ),
-                      strong: ({ node: _node, ...props }) => (
-                        <strong className="font-semibold" {...props} />
-                      ),
-                      h1: ({ node: _node, ...props }) => (
-                        <h1 className="mb-2 text-base font-semibold" {...props} />
-                      ),
-                      h2: ({ node: _node, ...props }) => (
-                        <h2 className="mb-2 text-sm font-semibold" {...props} />
-                      ),
-                      h3: ({ node: _node, ...props }) => (
-                        <h3 className="mb-2 text-sm font-semibold" {...props} />
-                      ),
-                      code: ({ node: _node, ...props }) => (
-                        <code className="rounded bg-slate-100 px-1 py-0.5 text-xs" {...props} />
-                      ),
-                      pre: ({ node: _node, ...props }) => (
-                        <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100" {...props} />
-                      ),
-                    }}
-                  >
-                    {selectedTask.description}
-                  </ReactMarkdown>
+                  <Markdown content={selectedTask.description} variant="description" />
                 </div>
               ) : (
                 <p className="text-sm text-slate-500">No description provided.</p>
@@ -1963,60 +2108,16 @@ export default function BoardDetailPage() {
                 <p className="text-sm text-slate-500">No comments yet.</p>
               ) : (
                 <div className="space-y-3">
-	                  {orderedComments.map((comment) => (
-	                    <div
-	                      key={comment.id}
-	                      className="rounded-xl border border-slate-200 bg-white p-3 select-none"
-	                    >
-	                      <>
-	                      <div className="flex items-center justify-between text-xs text-slate-500">
-	                        <span>
-	                          {comment.agent_id
-                            ? assigneeById.get(comment.agent_id) ?? "Agent"
-                            : "Admin"}
-                        </span>
-	                        <span>{formatCommentTimestamp(comment.created_at)}</span>
-	                      </div>
-	                      {comment.message?.trim() ? (
-	                        <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-slate-900 break-words">
-	                          <ReactMarkdown
-	                            remarkPlugins={[remarkGfm, remarkBreaks]}
-	                            components={{
-	                              ...MARKDOWN_TABLE_COMPONENTS,
-                              p: ({ node: _node, ...props }) => (
-                                <p
-                                  className="text-sm text-slate-900 break-words"
-                                  {...props}
-                                />
-                              ),
-                              ul: ({ node: _node, ...props }) => (
-                                <ul
-                                  className="list-disc pl-5 text-sm text-slate-900 break-words"
-                                  {...props}
-                                />
-                              ),
-                              li: ({ node: _node, ...props }) => (
-                                <li
-                                  className="mb-1 text-sm text-slate-900 break-words"
-                                  {...props}
-                                />
-                              ),
-                              strong: ({ node: _node, ...props }) => (
-                                <strong
-                                  className="font-semibold text-slate-900"
-                                  {...props}
-                                />
-                              ),
-                            }}
-                          >
-                            {comment.message}
-                          </ReactMarkdown>
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-sm text-slate-900">—</p>
-                      )}
-                      </>
-                    </div>
+                  {comments.map((comment) => (
+                    <TaskCommentCard
+                      key={comment.id}
+                      comment={comment}
+                      authorLabel={
+                        comment.agent_id
+                          ? assigneeById.get(comment.agent_id) ?? "Agent"
+                          : "Admin"
+                      }
+                    />
                   ))}
                 </div>
               )}
@@ -2063,41 +2164,7 @@ export default function BoardDetailPage() {
                 </p>
               ) : (
                 chatMessages.map((message) => (
-	                  <div
-	                    key={message.id}
-	                    className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 select-none"
-	                  >
-	                    <div className="flex flex-wrap items-center justify-between gap-2">
-	                      <p className="text-sm font-semibold text-slate-900">
-	                        {message.source ?? "User"}
-                      </p>
-                      <span className="text-xs text-slate-400">
-                        {formatTaskTimestamp(message.created_at)}
-                      </span>
-                    </div>
-	                    <div className="mt-2 select-text cursor-text text-sm leading-relaxed text-slate-900">
-	                      <ReactMarkdown
-	                        remarkPlugins={[remarkGfm]}
-	                        components={{
-	                          ...MARKDOWN_TABLE_COMPONENTS,
-                          p: ({ node: _node, ...props }) => (
-                            <p className="mb-2 last:mb-0" {...props} />
-                          ),
-                          ul: ({ node: _node, ...props }) => (
-                            <ul className="mb-2 list-disc pl-5" {...props} />
-                          ),
-                          ol: ({ node: _node, ...props }) => (
-                            <ol className="mb-2 list-decimal pl-5" {...props} />
-                          ),
-                          strong: ({ node: _node, ...props }) => (
-                            <strong className="font-semibold" {...props} />
-                          ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
+                  <ChatMessageCard key={message.id} message={message} />
                 ))
 	              )}
 	              <div ref={chatEndRef} />
@@ -2140,57 +2207,20 @@ export default function BoardDetailPage() {
             ) : (
               <div className="space-y-3">
                 {orderedLiveFeed.map((comment) => (
-	                  <div
-	                    key={comment.id}
-	                    className="rounded-xl border border-slate-200 bg-white p-3 select-none"
-	                  >
-	                    <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
-	                      <div className="min-w-0">
-	                        <p className="truncate text-xs font-semibold text-slate-700">
-                          {comment.task_id
-                            ? taskTitleById.get(comment.task_id) ?? "Task"
-                            : "Task"}
-                        </p>
-                        <p className="mt-1 text-[11px] text-slate-400">
-                          {comment.agent_id
-                            ? assigneeById.get(comment.agent_id) ?? "Agent"
-                            : "Admin"}
-                        </p>
-                      </div>
-                      <span className="text-[11px] text-slate-400">
-                        {formatCommentTimestamp(comment.created_at)}
-                      </span>
-                    </div>
-	                    {comment.message?.trim() ? (
-	                      <div className="mt-2 select-text cursor-text text-xs leading-relaxed text-slate-900">
-	                        <ReactMarkdown
-	                          remarkPlugins={[remarkGfm]}
-	                          components={{
-	                            ...MARKDOWN_TABLE_COMPONENTS,
-                            p: ({ node: _node, ...props }) => (
-                              <p className="mb-2 last:mb-0" {...props} />
-                            ),
-                            ul: ({ node: _node, ...props }) => (
-                              <ul className="mb-2 list-disc pl-5" {...props} />
-                            ),
-                            ol: ({ node: _node, ...props }) => (
-                              <ol className="mb-2 list-decimal pl-5" {...props} />
-                            ),
-                            li: ({ node: _node, ...props }) => (
-                              <li className="mb-1" {...props} />
-                            ),
-                            strong: ({ node: _node, ...props }) => (
-                              <strong className="font-semibold" {...props} />
-                            ),
-                          }}
-                        >
-                          {comment.message}
-                        </ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-xs text-slate-500">—</p>
-                    )}
-                  </div>
+                  <LiveFeedCard
+                    key={comment.id}
+                    comment={comment}
+                    taskTitle={
+                      comment.task_id
+                        ? taskTitleById.get(comment.task_id) ?? "Task"
+                        : "Task"
+                    }
+                    authorLabel={
+                      comment.agent_id
+                        ? assigneeById.get(comment.agent_id) ?? "Agent"
+                        : "Admin"
+                    }
+                  />
                 ))}
               </div>
             )}

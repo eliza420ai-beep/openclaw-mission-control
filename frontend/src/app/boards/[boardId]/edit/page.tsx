@@ -67,7 +67,6 @@ export default function EditBoardPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   const onboardingParam = searchParams.get("onboarding");
   const searchParamsString = searchParams.toString();
@@ -77,11 +76,11 @@ export default function EditBoardPage() {
     onboardingParam !== "0" &&
     onboardingParam.toLowerCase() !== "false";
 
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(shouldAutoOpenOnboarding);
+
   useEffect(() => {
     if (!boardId) return;
     if (!shouldAutoOpenOnboarding) return;
-
-    setIsOnboardingOpen(true);
 
     // Remove the flag from the URL so refreshes don't constantly reopen it.
     const nextParams = new URLSearchParams(searchParamsString);

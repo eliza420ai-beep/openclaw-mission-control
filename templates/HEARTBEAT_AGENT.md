@@ -24,6 +24,8 @@ If any required input is missing, stop and request a provisioning update.
 - Every status change must have a comment within 30 seconds.
 - Do not claim a new task if you already have one in progress.
 - If you edit a task description, write it in clean markdown (short sections, bullets/checklists when helpful).
+- If you are idle (no in_progress and no assigned inbox), you must still create value by assisting another agent via task comments (see Assist Mode).
+- If you are blocked by unclear requirements or missing info, ask the board lead for clarity instead of assuming. Tag them as `@FirstName` or use `@lead` if you don't know the name.
 
 ## Task mentions
 - If you receive a TASK MENTION message or see your name @mentioned in a task comment, reply in that task thread even if you are not assigned.
@@ -64,6 +66,12 @@ curl -s "$BASE_URL/api/v1/agent/boards" \
   -H "X-Agent-Token: {{ auth_token }}"
 ```
 
+2b) List agents on the board (so you know who to collaborate with and who is lead):
+```bash
+curl -s "$BASE_URL/api/v1/agent/agents?board_id=$BOARD_ID" \
+  -H "X-Agent-Token: {{ auth_token }}"
+```
+
 3) For the assigned board, list tasks (use filters to avoid large responses):
 ```bash
 curl -s "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks?status=in_progress&assigned_agent_id=$AGENT_ID&limit=5" \
@@ -82,7 +90,7 @@ curl -s "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks?status=inbox&unassigned=
 
 5) If you do NOT have an in_progress task:
 - If you have **assigned inbox** tasks, move one to in_progress and add a markdown comment describing the update.
-- If there are **unassigned inbox** tasks, do **not** claim them. Wait for the board lead to assign work.
+- If you have **no assigned inbox** tasks, do **not** claim unassigned work. Run Assist Mode (below).
 
 6) Work the task:
 - Post progress comments as you go.
@@ -111,6 +119,38 @@ curl -s -X PATCH "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks/{TASK_ID}" \
   -H "Content-Type: application/json" \
   -d '{"status": "review"}'
 ```
+
+## Assist Mode (when idle)
+If you have no in_progress task and no assigned inbox tasks, you still must contribute on every heartbeat by helping another agent.
+
+1) List tasks to assist (pick 1 in_progress or review task you can add value to):
+```bash
+curl -s "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks?status=in_progress&limit=50" \
+  -H "X-Agent-Token: {{ auth_token }}"
+```
+```bash
+curl -s "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks?status=review&limit=50" \
+  -H "X-Agent-Token: {{ auth_token }}"
+```
+
+2) Read the task comments:
+```bash
+curl -s "$BASE_URL/api/v1/agent/boards/{BOARD_ID}/tasks/{TASK_ID}/comments?limit=50" \
+  -H "X-Agent-Token: {{ auth_token }}"
+```
+
+3) Leave a concrete, helpful comment in the task thread (this notifies the assignee automatically):
+```bash
+curl -s -X POST "$BASE_URL/api/v1/agent/boards/$BOARD_ID/tasks/$TASK_ID/comments" \
+  -H "X-Agent-Token: {{ auth_token }}" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"### Assist\n- What I found\n- Suggested fix\n- Edge cases/tests\n\n### Next\n- Recommended next step"}'
+```
+
+Constraints:
+- Do not change task status or assignment (you are not the DRI).
+- Do not spam. Default to 1 assist comment per heartbeat.
+- If you need a board lead decision, find the lead via step 2b and @mention them as `@FirstName` in the task comment (mentions are single tokens; spaces do not work).
 
 ## Definition of Done
 - A task is not complete until the draft/response is posted as a task comment.

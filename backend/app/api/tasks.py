@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from collections import deque
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -40,6 +39,7 @@ from app.schemas.common import OkResponse
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
+from app.services.mentions import extract_mentions, matches_agent_mention
 
 router = APIRouter(prefix="/boards/{board_id}/tasks", tags=["tasks"])
 
@@ -51,7 +51,6 @@ TASK_EVENT_TYPES = {
     "task.comment",
 }
 SSE_SEEN_MAX = 2000
-MENTION_PATTERN = re.compile(r"@([A-Za-z][\w-]{0,31})")
 
 
 def _comment_validation_error() -> HTTPException:
@@ -99,23 +98,6 @@ def _parse_since(value: str | None) -> datetime | None:
     return parsed
 
 
-def _extract_mentions(message: str) -> set[str]:
-    return {match.group(1).lower() for match in MENTION_PATTERN.finditer(message)}
-
-
-def _matches_mention(agent: Agent, mentions: set[str]) -> bool:
-    if not mentions:
-        return False
-    name = (agent.name or "").strip()
-    if not name:
-        return False
-    normalized = name.lower()
-    if normalized in mentions:
-        return True
-    first = normalized.split()[0]
-    return first in mentions
-
-
 async def _lead_was_mentioned(
     session: AsyncSession,
     task: Task,
@@ -130,8 +112,8 @@ async def _lead_was_mentioned(
     for message in await session.exec(statement):
         if not message:
             continue
-        mentions = _extract_mentions(message)
-        if _matches_mention(lead, mentions):
+        mentions = extract_mentions(message)
+        if matches_agent_mention(lead, mentions):
             return True
     return False
 
@@ -527,7 +509,7 @@ async def update_task(
             if updates["status"] == "inbox":
                 task.assigned_agent_id = None
                 task.in_progress_at = None
-        task.status = updates["status"]
+            task.status = updates["status"]
         task.updated_at = utcnow()
         session.add(task)
         if task.status != previous_status:
@@ -718,12 +700,12 @@ async def create_task_comment(
     session.add(event)
     await session.commit()
     await session.refresh(event)
-    mention_names = _extract_mentions(payload.message)
+    mention_names = extract_mentions(payload.message)
     targets: dict[UUID, Agent] = {}
     if mention_names and task.board_id:
         statement = select(Agent).where(col(Agent.board_id) == task.board_id)
         for agent in await session.exec(statement):
-            if _matches_mention(agent, mention_names):
+            if matches_agent_mention(agent, mention_names):
                 targets[agent.id] = agent
     if not mention_names and task.assigned_agent_id:
         assigned_agent = await session.get(Agent, task.assigned_agent_id)
@@ -742,7 +724,7 @@ async def create_task_comment(
             for agent in targets.values():
                 if not agent.openclaw_session_id:
                     continue
-                mentioned = _matches_mention(agent, mention_names)
+                mentioned = matches_agent_mention(agent, mention_names)
                 header = "TASK MENTION" if mentioned else "NEW TASK COMMENT"
                 action_line = (
                     "You were mentioned in this comment."

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import re
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from uuid import UUID
@@ -26,10 +25,9 @@ from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.schemas.board_memory import BoardMemoryCreate, BoardMemoryRead
 from app.schemas.pagination import DefaultLimitOffsetPage
+from app.services.mentions import extract_mentions, matches_agent_mention
 
 router = APIRouter(prefix="/boards/{board_id}/memory", tags=["board-memory"])
-
-MENTION_PATTERN = re.compile(r"@([A-Za-z][\w-]{0,31})")
 
 
 def _parse_since(value: str | None) -> datetime | None:
@@ -50,23 +48,6 @@ def _parse_since(value: str | None) -> datetime | None:
 
 def _serialize_memory(memory: BoardMemory) -> dict[str, object]:
     return BoardMemoryRead.model_validate(memory, from_attributes=True).model_dump(mode="json")
-
-
-def _extract_mentions(message: str) -> set[str]:
-    return {match.group(1).lower() for match in MENTION_PATTERN.finditer(message)}
-
-
-def _matches_mention(agent: Agent, mentions: set[str]) -> bool:
-    if not mentions:
-        return False
-    name = (agent.name or "").strip()
-    if not name:
-        return False
-    normalized = name.lower()
-    if normalized in mentions:
-        return True
-    first = normalized.split()[0]
-    return first in mentions
 
 
 async def _gateway_config(session: AsyncSession, board: Board) -> GatewayClientConfig | None:
@@ -123,14 +104,14 @@ async def _notify_chat_targets(
     config = await _gateway_config(session, board)
     if config is None:
         return
-    mentions = _extract_mentions(memory.content)
+    mentions = extract_mentions(memory.content)
     statement = select(Agent).where(col(Agent.board_id) == board.id)
     targets: dict[str, Agent] = {}
     for agent in await session.exec(statement):
         if agent.is_board_lead:
             targets[str(agent.id)] = agent
             continue
-        if mentions and _matches_mention(agent, mentions):
+        if mentions and matches_agent_mention(agent, mentions):
             targets[str(agent.id)] = agent
     if actor.actor_type == "agent" and actor.agent:
         targets.pop(str(actor.agent.id), None)
@@ -148,7 +129,7 @@ async def _notify_chat_targets(
     for agent in targets.values():
         if not agent.openclaw_session_id:
             continue
-        mentioned = _matches_mention(agent, mentions)
+        mentioned = matches_agent_mention(agent, mentions)
         header = "BOARD CHAT MENTION" if mentioned else "BOARD CHAT"
         message = (
             f"{header}\n"
