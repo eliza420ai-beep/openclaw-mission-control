@@ -1158,11 +1158,18 @@ export default function BoardDetailPage() {
     return emoji ?? agentInitials(agent);
   };
 
-  const agentStatusLabel = (agent: Agent) => {
-    if (workingAgentIds.has(agent.id)) return "Working";
-    if (agent.status === "online") return "Active";
-    if (agent.status === "provisioning") return "Provisioning";
-    return "Offline";
+  const agentRoleLabel = (agent: Agent) => {
+    // Prefer the configured identity role from the API.
+    if (agent.identity_profile && typeof agent.identity_profile === "object") {
+      const rawRole = (agent.identity_profile as Record<string, unknown>).role;
+      if (typeof rawRole === "string") {
+        const trimmed = rawRole.trim();
+        if (trimmed) return trimmed;
+      }
+    }
+    if (agent.is_board_lead) return "Board lead";
+    if (agent.is_gateway_main) return "Gateway main";
+    return "Agent";
   };
 
   const formatCommentTimestamp = (value: string) => {
@@ -1464,7 +1471,7 @@ export default function BoardDetailPage() {
                             {agent.name}
                           </p>
                           <p className="text-[11px] text-slate-500">
-                            {agentStatusLabel(agent)}
+                            {agentRoleLabel(agent)}
                           </p>
                         </div>
                       </button>
