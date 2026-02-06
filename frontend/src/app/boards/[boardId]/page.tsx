@@ -4,7 +4,14 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
-import { Activity, MessageSquare, Pencil, Settings, X } from "lucide-react";
+import {
+  Activity,
+  ArrowUpRight,
+  MessageSquare,
+  Pencil,
+  Settings,
+  X,
+} from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -140,10 +147,7 @@ const SSE_RECONNECT_BACKOFF = {
 const MARKDOWN_TABLE_COMPONENTS: Components = {
   table: ({ node: _node, className, ...props }) => (
     <div className="my-3 overflow-x-auto">
-      <table
-        className={cn("w-full border-collapse", className)}
-        {...props}
-      />
+      <table className={cn("w-full border-collapse", className)} {...props} />
     </div>
   ),
   thead: ({ node: _node, className, ...props }) => (
@@ -240,7 +244,9 @@ const Markdown = memo(function Markdown({
       ? MARKDOWN_REMARK_PLUGINS_WITH_BREAKS
       : MARKDOWN_REMARK_PLUGINS_BASIC;
   const components =
-    variant === "description" ? MARKDOWN_COMPONENTS_DESCRIPTION : MARKDOWN_COMPONENTS_BASIC;
+    variant === "description"
+      ? MARKDOWN_COMPONENTS_DESCRIPTION
+      : MARKDOWN_COMPONENTS_BASIC;
   return (
     <ReactMarkdown remarkPlugins={remarkPlugins} components={components}>
       {trimmed}
@@ -296,7 +302,9 @@ const ChatMessageCard = memo(function ChatMessageCard({
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-slate-900">{message.source ?? "User"}</p>
+        <p className="text-sm font-semibold text-slate-900">
+          {message.source ?? "User"}
+        </p>
         <span className="text-xs text-slate-400">
           {formatShortTimestamp(message.created_at)}
         </span>
@@ -313,56 +321,80 @@ ChatMessageCard.displayName = "ChatMessageCard";
 const LiveFeedCard = memo(function LiveFeedCard({
   comment,
   taskTitle,
-  authorLabel,
+  authorName,
+  authorRole,
+  authorAvatar,
   onViewTask,
 }: {
   comment: TaskComment;
   taskTitle: string;
-  authorLabel: string;
+  authorName: string;
+  authorRole?: string | null;
+  authorAvatar: string;
   onViewTask?: () => void;
 }) {
   const message = (comment.message ?? "").trim();
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
-        <div className="min-w-0">
-          <button
-            type="button"
-            onClick={onViewTask}
-            disabled={!onViewTask}
-            className={cn(
-              "block truncate text-left text-xs font-semibold text-slate-700",
-              onViewTask
-                ? "cursor-pointer transition hover:text-slate-900 hover:underline"
-                : "cursor-default",
-            )}
-            title={onViewTask ? "View task" : undefined}
-          >
-            {taskTitle}
-          </button>
-          <p className="mt-1 text-[11px] text-slate-400">{authorLabel}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-slate-300">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+          {authorAvatar}
         </div>
-        <div className="flex flex-col items-end gap-1 text-right">
-          <span className="text-[11px] text-slate-400">
-            {formatShortTimestamp(comment.created_at)}
-          </span>
-          {onViewTask ? (
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
             <button
               type="button"
               onClick={onViewTask}
-              className="text-[11px] font-semibold text-slate-600 transition hover:text-slate-900"
+              disabled={!onViewTask}
+              className={cn(
+                "text-left text-sm font-semibold leading-snug text-slate-900",
+                onViewTask
+                  ? "cursor-pointer transition hover:text-slate-950 hover:underline"
+                  : "cursor-default",
+              )}
+              title={taskTitle}
+              style={{
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
             >
-              View task
+              {taskTitle}
             </button>
-          ) : null}
+            {onViewTask ? (
+              <button
+                type="button"
+                onClick={onViewTask}
+                className="inline-flex flex-shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                aria-label="View task"
+              >
+                View task
+                <ArrowUpRight className="h-3 w-3" />
+              </button>
+            ) : null}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+            <span className="font-medium text-slate-700">{authorName}</span>
+            {authorRole ? (
+              <>
+                <span className="text-slate-300">·</span>
+                <span className="text-slate-500">{authorRole}</span>
+              </>
+            ) : null}
+            <span className="text-slate-300">·</span>
+            <span className="text-slate-400">
+              {formatShortTimestamp(comment.created_at)}
+            </span>
+          </div>
         </div>
       </div>
       {message ? (
-        <div className="mt-2 select-text cursor-text text-xs leading-relaxed text-slate-900 break-words">
+        <div className="mt-3 select-text cursor-text text-sm leading-relaxed text-slate-900 break-words">
           <Markdown content={message} variant="basic" />
         </div>
       ) : (
-        <p className="mt-2 text-xs text-slate-500">—</p>
+        <p className="mt-3 text-sm text-slate-500">—</p>
       )}
     </div>
   );
@@ -519,9 +551,8 @@ export default function BoardDetailPage() {
     setApprovalsError(null);
     setChatError(null);
     try {
-      const snapshotResult = await getBoardSnapshotApiV1BoardsBoardIdSnapshotGet(
-        boardId,
-      );
+      const snapshotResult =
+        await getBoardSnapshotApiV1BoardsBoardIdSnapshotGet(boardId);
       if (snapshotResult.status !== 200) {
         throw new Error("Unable to load board snapshot.");
       }
@@ -532,7 +563,8 @@ export default function BoardDetailPage() {
       setApprovals((snapshot.approvals ?? []).map(normalizeApproval));
       setChatMessages(snapshot.chat_messages ?? []);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong.";
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
       setError(message);
       setApprovalsError(message);
       setChatError(message);
@@ -641,21 +673,23 @@ export default function BoardDetailPage() {
             }
             if (eventType === "memory" && data) {
               try {
-                const payload = JSON.parse(data) as { memory?: BoardChatMessage };
+                const payload = JSON.parse(data) as {
+                  memory?: BoardChatMessage;
+                };
                 if (payload.memory?.tags?.includes("chat")) {
                   setChatMessages((prev) => {
                     const exists = prev.some(
                       (item) => item.id === payload.memory?.id,
                     );
                     if (exists) return prev;
-	                    const next = [...prev, payload.memory as BoardChatMessage];
-	                    next.sort((a, b) => {
-	                      const aTime = apiDatetimeToMs(a.created_at) ?? 0;
-	                      const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-	                      return aTime - bTime;
-	                    });
-	                    return next;
-	                  });
+                    const next = [...prev, payload.memory as BoardChatMessage];
+                    next.sort((a, b) => {
+                      const aTime = apiDatetimeToMs(a.created_at) ?? 0;
+                      const bTime = apiDatetimeToMs(b.created_at) ?? 0;
+                      return aTime - bTime;
+                    });
+                    return next;
+                  });
                 }
               } catch {
                 // ignore malformed
@@ -900,41 +934,53 @@ export default function BoardDetailPage() {
                   task?: TaskRead;
                   comment?: TaskCommentRead;
                 };
-                if (payload.comment?.task_id && payload.type === "task.comment") {
+                if (
+                  payload.comment?.task_id &&
+                  payload.type === "task.comment"
+                ) {
                   pushLiveFeed(payload.comment);
                   setComments((prev) => {
-                    if (selectedTaskIdRef.current !== payload.comment?.task_id) {
+                    if (
+                      selectedTaskIdRef.current !== payload.comment?.task_id
+                    ) {
                       return prev;
                     }
-                    const exists = prev.some((item) => item.id === payload.comment?.id);
+                    const exists = prev.some(
+                      (item) => item.id === payload.comment?.id,
+                    );
                     if (exists) {
                       return prev;
-	                    }
-	                    const createdMs = apiDatetimeToMs(payload.comment?.created_at);
-	                    if (prev.length === 0 || createdMs === null) {
-	                      return [...prev, payload.comment as TaskComment];
-	                    }
-	                    const last = prev[prev.length - 1];
-	                    const lastMs = apiDatetimeToMs(last?.created_at);
-	                    if (lastMs !== null && createdMs >= lastMs) {
-	                      return [...prev, payload.comment as TaskComment];
-	                    }
-	                    const next = [...prev, payload.comment as TaskComment];
-	                    next.sort((a, b) => {
-	                      const aTime = apiDatetimeToMs(a.created_at) ?? 0;
-	                      const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-	                      return aTime - bTime;
-	                    });
-	                    return next;
-	                  });
+                    }
+                    const createdMs = apiDatetimeToMs(
+                      payload.comment?.created_at,
+                    );
+                    if (prev.length === 0 || createdMs === null) {
+                      return [...prev, payload.comment as TaskComment];
+                    }
+                    const last = prev[prev.length - 1];
+                    const lastMs = apiDatetimeToMs(last?.created_at);
+                    if (lastMs !== null && createdMs >= lastMs) {
+                      return [...prev, payload.comment as TaskComment];
+                    }
+                    const next = [...prev, payload.comment as TaskComment];
+                    next.sort((a, b) => {
+                      const aTime = apiDatetimeToMs(a.created_at) ?? 0;
+                      const bTime = apiDatetimeToMs(b.created_at) ?? 0;
+                      return aTime - bTime;
+                    });
+                    return next;
+                  });
                 } else if (payload.task) {
                   setTasks((prev) => {
-                    const index = prev.findIndex((item) => item.id === payload.task?.id);
+                    const index = prev.findIndex(
+                      (item) => item.id === payload.task?.id,
+                    );
                     if (index === -1) {
                       const assignee = payload.task?.assigned_agent_id
-                        ? agentsRef.current.find(
-                            (agent) => agent.id === payload.task?.assigned_agent_id,
-                          )?.name ?? null
+                        ? (agentsRef.current.find(
+                            (agent) =>
+                              agent.id === payload.task?.assigned_agent_id,
+                          )?.name ?? null)
                         : null;
                       const created = normalizeTask({
                         ...payload.task,
@@ -947,9 +993,10 @@ export default function BoardDetailPage() {
                     const next = [...prev];
                     const existing = next[index];
                     const assignee = payload.task?.assigned_agent_id
-                      ? agentsRef.current.find(
-                          (agent) => agent.id === payload.task?.assigned_agent_id,
-                        )?.name ?? null
+                      ? (agentsRef.current.find(
+                          (agent) =>
+                            agent.id === payload.task?.assigned_agent_id,
+                        )?.name ?? null)
                       : null;
                     const updated = normalizeTask({
                       ...existing,
@@ -1054,7 +1101,9 @@ export default function BoardDetailPage() {
                 if (payload.agent) {
                   const normalized = normalizeAgent(payload.agent);
                   setAgents((prev) => {
-                    const index = prev.findIndex((item) => item.id === normalized.id);
+                    const index = prev.findIndex(
+                      (item) => item.id === normalized.id,
+                    );
                     if (index === -1) {
                       return [normalized, ...prev];
                     }
@@ -1127,7 +1176,7 @@ export default function BoardDetailPage() {
       const created = normalizeTask({
         ...result.data,
         assignee: result.data.assigned_agent_id
-          ? assigneeById.get(result.data.assigned_agent_id) ?? null
+          ? (assigneeById.get(result.data.assigned_agent_id) ?? null)
           : null,
         approvals_count: 0,
         approvals_pending_count: 0,
@@ -1136,50 +1185,58 @@ export default function BoardDetailPage() {
       setIsDialogOpen(false);
       resetForm();
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Something went wrong.");
+      setCreateError(
+        err instanceof Error ? err.message : "Something went wrong.",
+      );
     } finally {
       setIsCreating(false);
     }
   };
 
-  const handleSendChat = useCallback(async (content: string): Promise<boolean> => {
-    if (!isSignedIn || !boardId) return false;
-    const trimmed = content.trim();
-    if (!trimmed) return false;
-    setIsChatSending(true);
-    setChatError(null);
-    try {
-      const result = await createBoardMemoryApiV1BoardsBoardIdMemoryPost(boardId, {
-        content: trimmed,
-        tags: ["chat"],
-      });
-      if (result.status !== 200) {
-        throw new Error("Unable to send message.");
+  const handleSendChat = useCallback(
+    async (content: string): Promise<boolean> => {
+      if (!isSignedIn || !boardId) return false;
+      const trimmed = content.trim();
+      if (!trimmed) return false;
+      setIsChatSending(true);
+      setChatError(null);
+      try {
+        const result = await createBoardMemoryApiV1BoardsBoardIdMemoryPost(
+          boardId,
+          {
+            content: trimmed,
+            tags: ["chat"],
+          },
+        );
+        if (result.status !== 200) {
+          throw new Error("Unable to send message.");
+        }
+        const created = result.data;
+        if (created.tags?.includes("chat")) {
+          setChatMessages((prev) => {
+            const exists = prev.some((item) => item.id === created.id);
+            if (exists) return prev;
+            const next = [...prev, created];
+            next.sort((a, b) => {
+              const aTime = apiDatetimeToMs(a.created_at) ?? 0;
+              const bTime = apiDatetimeToMs(b.created_at) ?? 0;
+              return aTime - bTime;
+            });
+            return next;
+          });
+        }
+        return true;
+      } catch (err) {
+        setChatError(
+          err instanceof Error ? err.message : "Unable to send message.",
+        );
+        return false;
+      } finally {
+        setIsChatSending(false);
       }
-      const created = result.data;
-      if (created.tags?.includes("chat")) {
-        setChatMessages((prev) => {
-	          const exists = prev.some((item) => item.id === created.id);
-	          if (exists) return prev;
-	          const next = [...prev, created];
-	          next.sort((a, b) => {
-	            const aTime = apiDatetimeToMs(a.created_at) ?? 0;
-	            const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-	            return aTime - bTime;
-	          });
-	          return next;
-	        });
-      }
-      return true;
-    } catch (err) {
-      setChatError(
-        err instanceof Error ? err.message : "Unable to send message.",
-      );
-      return false;
-    } finally {
-      setIsChatSending(false);
-    }
-  }, [boardId, isSignedIn]);
+    },
+    [boardId, isSignedIn],
+  );
 
   const assigneeById = useMemo(() => {
     const map = new Map<string, string>();
@@ -1307,41 +1364,49 @@ export default function BoardDetailPage() {
     });
   }, [agents, workingAgentIds]);
 
-  const loadComments = useCallback(async (taskId: string) => {
-    if (!isSignedIn || !boardId) return;
-    setIsCommentsLoading(true);
-    setCommentsError(null);
-    try {
-      const result =
-        await listTaskCommentsApiV1BoardsBoardIdTasksTaskIdCommentsGet(
-          boardId,
-          taskId,
+  const loadComments = useCallback(
+    async (taskId: string) => {
+      if (!isSignedIn || !boardId) return;
+      setIsCommentsLoading(true);
+      setCommentsError(null);
+      try {
+        const result =
+          await listTaskCommentsApiV1BoardsBoardIdTasksTaskIdCommentsGet(
+            boardId,
+            taskId,
+          );
+        if (result.status !== 200) throw new Error("Unable to load comments.");
+        const items = [...(result.data.items ?? [])];
+        items.sort((a, b) => {
+          const aTime = apiDatetimeToMs(a.created_at) ?? 0;
+          const bTime = apiDatetimeToMs(b.created_at) ?? 0;
+          return aTime - bTime;
+        });
+        setComments(items);
+      } catch (err) {
+        setCommentsError(
+          err instanceof Error ? err.message : "Something went wrong.",
         );
-      if (result.status !== 200) throw new Error("Unable to load comments.");
-      const items = [...(result.data.items ?? [])];
-      items.sort((a, b) => {
-        const aTime = apiDatetimeToMs(a.created_at) ?? 0;
-        const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-        return aTime - bTime;
-      });
-      setComments(items);
-    } catch (err) {
-      setCommentsError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setIsCommentsLoading(false);
-    }
-  }, [boardId, isSignedIn]);
+      } finally {
+        setIsCommentsLoading(false);
+      }
+    },
+    [boardId, isSignedIn],
+  );
 
-  const openComments = useCallback((task: { id: string }) => {
-    setIsChatOpen(false);
-    setIsLiveFeedOpen(false);
-    const fullTask = tasksRef.current.find((item) => item.id === task.id);
-    if (!fullTask) return;
-    selectedTaskIdRef.current = fullTask.id;
-    setSelectedTask(fullTask);
-    setIsDetailOpen(true);
-    void loadComments(task.id);
-  }, [loadComments]);
+  const openComments = useCallback(
+    (task: { id: string }) => {
+      setIsChatOpen(false);
+      setIsLiveFeedOpen(false);
+      const fullTask = tasksRef.current.find((item) => item.id === task.id);
+      if (!fullTask) return;
+      selectedTaskIdRef.current = fullTask.id;
+      setSelectedTask(fullTask);
+      setIsDetailOpen(true);
+      void loadComments(task.id);
+    },
+    [loadComments],
+  );
 
   const closeComments = () => {
     setIsDetailOpen(false);
@@ -1470,20 +1535,24 @@ export default function BoardDetailPage() {
         ...previous,
         ...result.data,
         assignee: result.data.assigned_agent_id
-          ? assigneeById.get(result.data.assigned_agent_id) ?? null
+          ? (assigneeById.get(result.data.assigned_agent_id) ?? null)
           : null,
         approvals_count: previous.approvals_count,
         approvals_pending_count: previous.approvals_pending_count,
       } as TaskCardRead);
       setTasks((prev) =>
-        prev.map((task) => (task.id === updated.id ? { ...task, ...updated } : task)),
+        prev.map((task) =>
+          task.id === updated.id ? { ...task, ...updated } : task,
+        ),
       );
       setSelectedTask(updated);
       if (closeOnSuccess) {
         setIsEditDialogOpen(false);
       }
     } catch (err) {
-      setSaveTaskError(err instanceof Error ? err.message : "Something went wrong.");
+      setSaveTaskError(
+        err instanceof Error ? err.message : "Something went wrong.",
+      );
     } finally {
       setIsSavingTask(false);
     }
@@ -1522,69 +1591,76 @@ export default function BoardDetailPage() {
     }
   };
 
-  const handleTaskMove = useCallback(async (taskId: string, status: TaskStatus) => {
-    if (!isSignedIn || !boardId) return;
-    const currentTask = tasksRef.current.find((task) => task.id === taskId);
-    if (!currentTask || currentTask.status === status) return;
-    if (currentTask.is_blocked && status !== "inbox") {
-      setError("Task is blocked by incomplete dependencies.");
-      return;
-    }
-    const previousTasks = tasksRef.current;
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              status,
-              assigned_agent_id:
-                status === "inbox" ? null : task.assigned_agent_id,
-              assignee: status === "inbox" ? null : task.assignee,
-            }
-          : task,
-      ),
-    );
-    try {
-      const result = await updateTaskApiV1BoardsBoardIdTasksTaskIdPatch(
-        boardId,
-        taskId,
-        { status },
-      );
-      if (result.status === 409) {
-        const blockedIds = result.data.detail.blocked_by_task_ids ?? [];
-        const blockedTitles = blockedIds
-          .map((id) => taskTitleById.get(id) ?? id)
-          .join(", ");
-        throw new Error(
-          blockedTitles
-            ? `${result.data.detail.message} Blocked by: ${blockedTitles}`
-            : result.data.detail.message,
-        );
+  const handleTaskMove = useCallback(
+    async (taskId: string, status: TaskStatus) => {
+      if (!isSignedIn || !boardId) return;
+      const currentTask = tasksRef.current.find((task) => task.id === taskId);
+      if (!currentTask || currentTask.status === status) return;
+      if (currentTask.is_blocked && status !== "inbox") {
+        setError("Task is blocked by incomplete dependencies.");
+        return;
       }
-      if (result.status === 422) {
-        throw new Error(
-          result.data.detail?.[0]?.msg ?? "Validation error while moving task.",
-        );
-      }
-      const assignee = result.data.assigned_agent_id
-        ? agentsRef.current.find((agent) => agent.id === result.data.assigned_agent_id)
-            ?.name ?? null
-        : null;
-      const updated = normalizeTask({
-        ...currentTask,
-        ...result.data,
-        assignee,
-        approvals_count: currentTask.approvals_count,
-        approvals_pending_count: currentTask.approvals_pending_count,
-      } as TaskCardRead);
+      const previousTasks = tasksRef.current;
       setTasks((prev) =>
-        prev.map((task) => (task.id === updated.id ? { ...task, ...updated } : task)),
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                status,
+                assigned_agent_id:
+                  status === "inbox" ? null : task.assigned_agent_id,
+                assignee: status === "inbox" ? null : task.assignee,
+              }
+            : task,
+        ),
       );
-    } catch (err) {
-      setTasks(previousTasks);
-      setError(err instanceof Error ? err.message : "Unable to move task.");
-    }
-  }, [boardId, isSignedIn, taskTitleById]);
+      try {
+        const result = await updateTaskApiV1BoardsBoardIdTasksTaskIdPatch(
+          boardId,
+          taskId,
+          { status },
+        );
+        if (result.status === 409) {
+          const blockedIds = result.data.detail.blocked_by_task_ids ?? [];
+          const blockedTitles = blockedIds
+            .map((id) => taskTitleById.get(id) ?? id)
+            .join(", ");
+          throw new Error(
+            blockedTitles
+              ? `${result.data.detail.message} Blocked by: ${blockedTitles}`
+              : result.data.detail.message,
+          );
+        }
+        if (result.status === 422) {
+          throw new Error(
+            result.data.detail?.[0]?.msg ??
+              "Validation error while moving task.",
+          );
+        }
+        const assignee = result.data.assigned_agent_id
+          ? (agentsRef.current.find(
+              (agent) => agent.id === result.data.assigned_agent_id,
+            )?.name ?? null)
+          : null;
+        const updated = normalizeTask({
+          ...currentTask,
+          ...result.data,
+          assignee,
+          approvals_count: currentTask.approvals_count,
+          approvals_pending_count: currentTask.approvals_pending_count,
+        } as TaskCardRead);
+        setTasks((prev) =>
+          prev.map((task) =>
+            task.id === updated.id ? { ...task, ...updated } : task,
+          ),
+        );
+      } catch (err) {
+        setTasks(previousTasks);
+        setError(err instanceof Error ? err.message : "Unable to move task.");
+      }
+    },
+    [boardId, isSignedIn, taskTitleById],
+  );
 
   const agentInitials = (agent: Agent) =>
     agent.name
@@ -1608,7 +1684,8 @@ export default function BoardDetailPage() {
     if (agent.is_board_lead) return "⚙️";
     let emojiValue: string | null = null;
     if (agent.identity_profile && typeof agent.identity_profile === "object") {
-      const rawEmoji = (agent.identity_profile as Record<string, unknown>).emoji;
+      const rawEmoji = (agent.identity_profile as Record<string, unknown>)
+        .emoji;
       emojiValue = typeof rawEmoji === "string" ? rawEmoji : null;
     }
     const emoji = resolveEmoji(emojiValue);
@@ -1683,16 +1760,11 @@ export default function BoardDetailPage() {
     value
       .split(".")
       .map((part) =>
-        part
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (char) => char.toUpperCase())
+        part.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
       )
       .join(" · ");
 
-  const approvalPayloadValue = (
-    payload: Approval["payload"],
-    key: string,
-  ) => {
+  const approvalPayloadValue = (payload: Approval["payload"], key: string) => {
     if (!payload || typeof payload !== "object") return null;
     const value = (payload as Record<string, unknown>)[key];
     if (typeof value === "string" || typeof value === "number") {
@@ -2001,7 +2073,8 @@ export default function BoardDetailPage() {
                                   {task.approvals_pending_count ? (
                                     <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                                       <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                      Approval needed · {task.approvals_pending_count}
+                                      Approval needed ·{" "}
+                                      {task.approvals_pending_count}
                                     </span>
                                   ) : null}
                                   <span
@@ -2056,22 +2129,22 @@ export default function BoardDetailPage() {
           }}
         />
       ) : null}
-	      <aside
-	        className={cn(
-	          "fixed right-0 top-0 z-50 h-full w-[max(760px,45vw)] max-w-[99vw] transform bg-white shadow-2xl transition-transform",
-	          isDetailOpen ? "transform-none" : "translate-x-full",
-	        )}
-	      >
-          <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Task detail
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-900">
-                  {selectedTask?.title ?? "Task"}
-                </p>
-              </div>
+      <aside
+        className={cn(
+          "fixed right-0 top-0 z-50 h-full w-[max(760px,45vw)] max-w-[99vw] transform bg-white shadow-2xl transition-transform",
+          isDetailOpen ? "transform-none" : "translate-x-full",
+        )}
+      >
+        <div className="flex h-full flex-col">
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Task detail
+              </p>
+              <p className="mt-1 text-sm font-medium text-slate-900">
+                {selectedTask?.title ?? "Task"}
+              </p>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -2089,7 +2162,7 @@ export default function BoardDetailPage() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            </div>
+          </div>
           <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -2097,10 +2170,15 @@ export default function BoardDetailPage() {
               </p>
               {selectedTask?.description ? (
                 <div className="prose prose-sm max-w-none text-slate-700">
-                  <Markdown content={selectedTask.description} variant="description" />
+                  <Markdown
+                    content={selectedTask.description}
+                    variant="description"
+                  />
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">No description provided.</p>
+                <p className="text-sm text-slate-500">
+                  No description provided.
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -2204,7 +2282,8 @@ export default function BoardDetailPage() {
                             {humanizeApprovalAction(approval.action_type)}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            Requested {formatApprovalTimestamp(approval.created_at)}
+                            Requested{" "}
+                            {formatApprovalTimestamp(approval.created_at)}
                           </p>
                         </div>
                         <span className="text-xs font-semibold text-slate-700">
@@ -2299,7 +2378,7 @@ export default function BoardDetailPage() {
                       comment={comment}
                       authorLabel={
                         comment.agent_id
-                          ? assigneeById.get(comment.agent_id) ?? "Agent"
+                          ? (assigneeById.get(comment.agent_id) ?? "Agent")
                           : "Admin"
                       }
                     />
@@ -2311,12 +2390,12 @@ export default function BoardDetailPage() {
         </div>
       </aside>
 
-	      <aside
-	        className={cn(
-	          "fixed right-0 top-0 z-50 h-full w-[560px] max-w-[96vw] transform border-l border-slate-200 bg-white shadow-2xl transition-transform",
-	          isChatOpen ? "transform-none" : "translate-x-full",
-	        )}
-	      >
+      <aside
+        className={cn(
+          "fixed right-0 top-0 z-50 h-full w-[560px] max-w-[96vw] transform border-l border-slate-200 bg-white shadow-2xl transition-transform",
+          isChatOpen ? "transform-none" : "translate-x-full",
+        )}
+      >
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <div>
@@ -2336,10 +2415,10 @@ export default function BoardDetailPage() {
               <X className="h-4 w-4" />
             </button>
           </div>
-	          <div className="flex flex-1 flex-col overflow-hidden px-6 py-4">
-	            <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
-	              {chatError ? (
-	                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="flex flex-1 flex-col overflow-hidden px-6 py-4">
+            <div className="flex-1 space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
+              {chatError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   {chatError}
                 </div>
               ) : null}
@@ -2351,20 +2430,23 @@ export default function BoardDetailPage() {
                 chatMessages.map((message) => (
                   <ChatMessageCard key={message.id} message={message} />
                 ))
-	              )}
-	              <div ref={chatEndRef} />
-	            </div>
-	            <BoardChatComposer isSending={isChatSending} onSend={handleSendChat} />
-	          </div>
-	        </div>
-	      </aside>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            <BoardChatComposer
+              isSending={isChatSending}
+              onSend={handleSendChat}
+            />
+          </div>
+        </div>
+      </aside>
 
-	      <aside
-	        className={cn(
-	          "fixed right-0 top-0 z-50 h-full w-[520px] max-w-[96vw] transform border-l border-slate-200 bg-white shadow-2xl transition-transform",
-	          isLiveFeedOpen ? "transform-none" : "translate-x-full",
-	        )}
-	      >
+      <aside
+        className={cn(
+          "fixed right-0 top-0 z-50 h-full w-[520px] max-w-[96vw] transform border-l border-slate-200 bg-white shadow-2xl transition-transform",
+          isLiveFeedOpen ? "transform-none" : "translate-x-full",
+        )}
+      >
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <div>
@@ -2393,18 +2475,27 @@ export default function BoardDetailPage() {
               <div className="space-y-3">
                 {orderedLiveFeed.map((comment) => {
                   const taskId = comment.task_id;
+                  const authorAgent = comment.agent_id
+                    ? (agents.find((agent) => agent.id === comment.agent_id) ??
+                      null)
+                    : null;
+                  const authorName = authorAgent ? authorAgent.name : "Admin";
+                  const authorRole = authorAgent
+                    ? agentRoleLabel(authorAgent)
+                    : null;
+                  const authorAvatar = authorAgent
+                    ? agentAvatarLabel(authorAgent)
+                    : "A";
                   return (
                     <LiveFeedCard
                       key={comment.id}
                       comment={comment}
                       taskTitle={
-                        taskId ? taskTitleById.get(taskId) ?? "Task" : "Task"
+                        taskId ? (taskTitleById.get(taskId) ?? "Task") : "Task"
                       }
-                      authorLabel={
-                        comment.agent_id
-                          ? assigneeById.get(comment.agent_id) ?? "Agent"
-                          : "Admin"
-                      }
+                      authorName={authorName}
+                      authorRole={authorRole}
+                      authorAvatar={authorAvatar}
                       onViewTask={
                         taskId ? () => openComments({ id: taskId }) : undefined
                       }
@@ -2713,16 +2804,10 @@ export default function BoardDetailPage() {
             ) : null}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleCreateTask}
-              disabled={isCreating}
-            >
+            <Button onClick={handleCreateTask} disabled={isCreating}>
               {isCreating ? "Creating…" : "Create task"}
             </Button>
           </DialogFooter>
