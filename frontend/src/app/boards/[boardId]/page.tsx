@@ -313,22 +313,48 @@ const LiveFeedCard = memo(function LiveFeedCard({
   comment,
   taskTitle,
   authorLabel,
+  onViewTask,
 }: {
   comment: TaskComment;
   taskTitle: string;
   authorLabel: string;
+  onViewTask?: () => void;
 }) {
   const message = (comment.message ?? "").trim();
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-slate-700">{taskTitle}</p>
+          <button
+            type="button"
+            onClick={onViewTask}
+            disabled={!onViewTask}
+            className={cn(
+              "block truncate text-left text-xs font-semibold text-slate-700",
+              onViewTask
+                ? "cursor-pointer transition hover:text-slate-900 hover:underline"
+                : "cursor-default",
+            )}
+            title={onViewTask ? "View task" : undefined}
+          >
+            {taskTitle}
+          </button>
           <p className="mt-1 text-[11px] text-slate-400">{authorLabel}</p>
         </div>
-        <span className="text-[11px] text-slate-400">
-          {formatShortTimestamp(comment.created_at)}
-        </span>
+        <div className="flex flex-col items-end gap-1 text-right">
+          <span className="text-[11px] text-slate-400">
+            {formatShortTimestamp(comment.created_at)}
+          </span>
+          {onViewTask ? (
+            <button
+              type="button"
+              onClick={onViewTask}
+              className="text-[11px] font-semibold text-slate-600 transition hover:text-slate-900"
+            >
+              View task
+            </button>
+          ) : null}
+        </div>
       </div>
       {message ? (
         <div className="mt-2 select-text cursor-text text-xs leading-relaxed text-slate-900 break-words">
@@ -2365,22 +2391,26 @@ export default function BoardDetailPage() {
               </p>
             ) : (
               <div className="space-y-3">
-                {orderedLiveFeed.map((comment) => (
-                  <LiveFeedCard
-                    key={comment.id}
-                    comment={comment}
-                    taskTitle={
-                      comment.task_id
-                        ? taskTitleById.get(comment.task_id) ?? "Task"
-                        : "Task"
-                    }
-                    authorLabel={
-                      comment.agent_id
-                        ? assigneeById.get(comment.agent_id) ?? "Agent"
-                        : "Admin"
-                    }
-                  />
-                ))}
+                {orderedLiveFeed.map((comment) => {
+                  const taskId = comment.task_id;
+                  return (
+                    <LiveFeedCard
+                      key={comment.id}
+                      comment={comment}
+                      taskTitle={
+                        taskId ? taskTitleById.get(taskId) ?? "Task" : "Task"
+                      }
+                      authorLabel={
+                        comment.agent_id
+                          ? assigneeById.get(comment.agent_id) ?? "Agent"
+                          : "Admin"
+                      }
+                      onViewTask={
+                        taskId ? () => openComments({ id: taskId }) : undefined
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
