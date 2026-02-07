@@ -1135,18 +1135,23 @@ export default function BoardDetailPage() {
                       payload.comment?.created_at,
                     );
                     if (prev.length === 0 || createdMs === null) {
-                      return [...prev, payload.comment as TaskComment];
+                      return [payload.comment as TaskComment, ...prev];
+                    }
+                    const first = prev[0];
+                    const firstMs = apiDatetimeToMs(first?.created_at);
+                    if (firstMs !== null && createdMs >= firstMs) {
+                      return [payload.comment as TaskComment, ...prev];
                     }
                     const last = prev[prev.length - 1];
                     const lastMs = apiDatetimeToMs(last?.created_at);
-                    if (lastMs !== null && createdMs >= lastMs) {
+                    if (lastMs !== null && createdMs <= lastMs) {
                       return [...prev, payload.comment as TaskComment];
                     }
                     const next = [...prev, payload.comment as TaskComment];
                     next.sort((a, b) => {
                       const aTime = apiDatetimeToMs(a.created_at) ?? 0;
                       const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-                      return aTime - bTime;
+                      return bTime - aTime;
                     });
                     return next;
                   });
@@ -1607,7 +1612,7 @@ export default function BoardDetailPage() {
         items.sort((a, b) => {
           const aTime = apiDatetimeToMs(a.created_at) ?? 0;
           const bTime = apiDatetimeToMs(b.created_at) ?? 0;
-          return aTime - bTime;
+          return bTime - aTime;
         });
         setComments(items);
       } catch (err) {
