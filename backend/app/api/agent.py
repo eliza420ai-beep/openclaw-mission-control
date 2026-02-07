@@ -21,7 +21,12 @@ from app.core.time import utcnow
 from app.db.pagination import paginate
 from app.db.session import get_session
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, openclaw_call, send_message
+from app.integrations.openclaw_gateway import (
+    OpenClawGatewayError,
+    ensure_session,
+    openclaw_call,
+    send_message,
+)
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.approvals import Approval
