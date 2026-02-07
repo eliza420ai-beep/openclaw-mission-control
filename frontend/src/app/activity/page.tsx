@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
-import { SignInButton, SignedIn, SignedOut, useAuth } from "@clerk/nextjs";
+import { SignInButton, SignedIn, SignedOut, useAuth } from "@/auth/clerk";
 import { ArrowUpRight, Activity as ActivityIcon } from "lucide-react";
 
 import { ApiError } from "@/api/mutator";
