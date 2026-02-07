@@ -170,3 +170,7 @@ Adjust ports in `.env` (copied from `.env.example`):
 - `BACKEND_PORT`
 - `POSTGRES_PORT`
 - `REDIS_PORT`
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=abhi1693/openclaw-mission-control&type=date&legend=top-left)](https://www.star-history.com/#abhi1693/openclaw-mission-control&type=date&legend=top-left)
