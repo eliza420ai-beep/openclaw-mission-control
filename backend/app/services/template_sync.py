@@ -24,6 +24,29 @@ from app.schemas.gateways import GatewayTemplatesSyncError, GatewayTemplatesSync
 from app.services.agent_provisioning import provision_agent, provision_main_agent
 
 _TOOLS_KV_RE = re.compile(r"^(?P<key>[A-Z0-9_]+)=(?P<value>.*)$")
+SESSION_KEY_PARTS_MIN = 2
+_NON_TRANSIENT_GATEWAY_ERROR_MARKERS = ("unsupported file",)
+_TRANSIENT_GATEWAY_ERROR_MARKERS = (
+    "connect call failed",
+    "connection refused",
+    "errno 111",
+    "econnrefused",
+    "did not receive a valid http response",
+    "no route to host",
+    "network is unreachable",
+    "host is down",
+    "name or service not known",
+    "received 1012",
+    "service restart",
+    "http 503",
+    "http 502",
+    "http 504",
+    "temporar",
+    "timeout",
+    "timed out",
+    "connection closed",
+    "connection reset",
+)
 
 T = TypeVar("T")
 
@@ -39,31 +62,15 @@ def _is_transient_gateway_error(exc: Exception) -> bool:
     message = str(exc).lower()
     if not message:
         return False
-    if "unsupported file" in message:
+    if any(marker in message for marker in _NON_TRANSIENT_GATEWAY_ERROR_MARKERS):
         return False
-    if "connect call failed" in message or "connection refused" in message:
-        return True
-    if "errno 111" in message or "econnrefused" in message:
-        return True
-    if "did not receive a valid http response" in message:
-        return True
-    if "no route to host" in message or "network is unreachable" in message:
-        return True
-    if "host is down" in message or "name or service not known" in message:
-        return True
-    if "received 1012" in message or "service restart" in message:
-        return True
-    if "http 503" in message or ("503" in message and "websocket" in message):
-        return True
-    if "http 502" in message or "http 504" in message:
-        return True
-    if "temporar" in message:
-        return True
-    if "timeout" in message or "timed out" in message:
-        return True
-    if "connection closed" in message or "connection reset" in message:
-        return True
-    return False
+    return ("503" in message and "websocket" in message) or any(
+        marker in message for marker in _TRANSIENT_GATEWAY_ERROR_MARKERS
+    )
+
+
+def _gateway_timeout_message(exc: OpenClawGatewayError) -> str:
+    return f"Gateway unreachable after 10 minutes (template sync timeout). Last error: {exc}"
 
 
 class _GatewayBackoff:
@@ -91,18 +98,13 @@ class _GatewayBackoff:
         while True:
             try:
                 value = await fn()
-                self.reset()
-                return value
             except OpenClawGatewayError as exc:
                 if not _is_transient_gateway_error(exc):
                     raise
                 now = asyncio.get_running_loop().time()
                 remaining = deadline_s - now
                 if remaining <= 0:
-                    raise TimeoutError(
-                        "Gateway unreachable after 10 minutes (template sync timeout). "
-                        f"Last error: {exc}"
-                    ) from exc
+                    raise TimeoutError(_gateway_timeout_message(exc)) from exc
 
                 sleep_s = min(self._delay_s, remaining)
                 if self._jitter:
@@ -110,6 +112,9 @@ class _GatewayBackoff:
                 sleep_s = max(0.0, min(sleep_s, remaining))
                 await asyncio.sleep(sleep_s)
                 self._delay_s = min(self._delay_s * 2.0, self._max_delay_s)
+            else:
+                self.reset()
+                return value
 
 
 async def _with_gateway_retry(
@@ -127,7 +132,7 @@ def _agent_id_from_session_key(session_key: str | None) -> str | None:
     if not value.startswith("agent:"):
         return None
     parts = value.split(":")
-    if len(parts) < 2:
+    if len(parts) < SESSION_KEY_PARTS_MIN:
         return None
     agent_id = parts[1].strip()
     return agent_id or None
@@ -167,7 +172,7 @@ def _gateway_agent_id(agent: Agent) -> str:
     session_key = agent.openclaw_session_id or ""
     if session_key.startswith("agent:"):
         parts = session_key.split(":")
-        if len(parts) >= 2 and parts[1]:
+        if len(parts) >= SESSION_KEY_PARTS_MIN and parts[1]:
             return parts[1]
     return _slugify(agent.name)
 
