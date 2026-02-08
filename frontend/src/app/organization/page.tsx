@@ -3,12 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { SignedIn, SignedOut, useAuth } from "@/auth/clerk";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Copy, UserPlus, Users } from "lucide-react";
 
-import { ApiError } from "@/api/mutator";
+import { ApiError, customFetch } from "@/api/mutator";
 import {
   type listBoardsApiV1BoardsGetResponse,
   useListBoardsApiV1BoardsGet,
@@ -17,6 +18,7 @@ import {
   type getMyOrgApiV1OrganizationsMeGetResponse,
   type getMyMembershipApiV1OrganizationsMeMemberGetResponse,
   type getOrgMemberApiV1OrganizationsMeMembersMemberIdGetResponse,
+  getListMyOrganizationsApiV1OrganizationsMeListGetQueryKey,
   type listOrgInvitesApiV1OrganizationsMeInvitesGetResponse,
   type listOrgMembersApiV1OrganizationsMeMembersGetResponse,
   getGetOrgMemberApiV1OrganizationsMeMembersMemberIdGetQueryKey,
@@ -42,6 +44,7 @@ import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
 import { DashboardSidebar } from "@/components/organisms/DashboardSidebar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   Dialog,
   DialogContent,
@@ -303,6 +306,7 @@ function BoardAccessEditor({
 
 export default function OrganizationPage() {
   const { isSignedIn } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -324,6 +328,7 @@ export default function OrganizationPage() {
   const [accessRole, setAccessRole] = useState<string | null>(null);
   const [accessMap, setAccessMap] = useState<BoardAccessState | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [deleteOrgOpen, setDeleteOrgOpen] = useState(false);
 
   const orgQuery = useGetMyOrgApiV1OrganizationsMeGet<
     getMyOrgApiV1OrganizationsMeGetResponse,
@@ -371,10 +376,10 @@ export default function OrganizationPage() {
     },
   });
 
-  const isAdmin =
-    membershipQuery.data?.status === 200 &&
-    (membershipQuery.data.data.role === "admin" ||
-      membershipQuery.data.data.role === "owner");
+  const membershipRole =
+    membershipQuery.data?.status === 200 ? membershipQuery.data.data.role : null;
+  const isOwner = membershipRole === "owner";
+  const isAdmin = membershipRole === "admin" || membershipRole === "owner";
 
   const invitesQuery = useListOrgInvitesApiV1OrganizationsMeInvitesGet<
     listOrgInvitesApiV1OrganizationsMeInvitesGetResponse,
@@ -532,6 +537,25 @@ export default function OrganizationPage() {
         },
       },
     });
+
+  const deleteOrganizationMutation = useMutation<
+    { data: unknown; status: number; headers: Headers },
+    ApiError
+  >({
+    mutationFn: async () =>
+      customFetch<{ data: unknown; status: number; headers: Headers }>(
+        "/api/v1/organizations/me",
+        { method: "DELETE" },
+      ),
+    onSuccess: async () => {
+      setDeleteOrgOpen(false);
+      await queryClient.invalidateQueries({
+        queryKey: getListMyOrganizationsApiV1OrganizationsMeListGetQueryKey(),
+      });
+      router.push("/dashboard");
+      router.refresh();
+    },
+  });
 
   const resetAccessState = () => {
     setAccessRole(null);
@@ -691,6 +715,11 @@ export default function OrganizationPage() {
     }
   };
 
+  const handleDeleteOrganization = () => {
+    if (!isOwner) return;
+    deleteOrganizationMutation.mutate();
+  };
+
   const memberAccessSummary = (member: OrganizationMemberRead) =>
     summarizeAccess(member.all_boards_read, member.all_boards_write);
 
@@ -760,17 +789,32 @@ export default function OrganizationPage() {
                     </span>
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  onClick={() => setInviteDialogOpen(true)}
-                  disabled={!isAdmin}
-                  title={
-                    isAdmin ? undefined : "Only organization admins can invite"
-                  }
-                >
-                  <UserPlus className="h-4 w-4" />
-                  Invite member
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  {isOwner ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-rose-200 text-rose-600 hover:border-rose-300 hover:text-rose-700"
+                      onClick={() => {
+                        deleteOrganizationMutation.reset();
+                        setDeleteOrgOpen(true);
+                      }}
+                    >
+                      Delete organization
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    onClick={() => setInviteDialogOpen(true)}
+                    disabled={!isAdmin}
+                    title={
+                      isAdmin ? undefined : "Only organization admins can invite"
+                    }
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Invite member
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1150,6 +1194,29 @@ export default function OrganizationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmActionDialog
+        open={deleteOrgOpen}
+        onOpenChange={(open) => {
+          setDeleteOrgOpen(open);
+          if (!open) {
+            deleteOrganizationMutation.reset();
+          }
+        }}
+        ariaLabel="Delete organization"
+        title="Delete organization"
+        description={
+          <>
+            This will permanently delete <strong>{orgName}</strong>, including
+            boards, groups, gateways, members, and invites. This action cannot
+            be undone.
+          </>
+        }
+        errorMessage={deleteOrganizationMutation.error?.message}
+        onConfirm={handleDeleteOrganization}
+        isConfirming={deleteOrganizationMutation.isPending}
+        confirmLabel="Delete organization"
+        confirmingLabel="Deleting…"
+      />
     </DashboardShell>
   );
 }

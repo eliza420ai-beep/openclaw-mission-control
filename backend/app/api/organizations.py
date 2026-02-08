@@ -5,7 +5,7 @@ from typing import Any, Sequence
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, func
+from sqlalchemy import delete, func, update
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -14,13 +14,25 @@ from app.core.auth import AuthContext, get_auth_context
 from app.core.time import utcnow
 from app.db.pagination import paginate
 from app.db.session import get_session
+from app.models.activity_events import ActivityEvent
+from app.models.agents import Agent
+from app.models.approvals import Approval
+from app.models.board_group_memory import BoardGroupMemory
+from app.models.board_groups import BoardGroup
+from app.models.board_memory import BoardMemory
+from app.models.board_onboarding import BoardOnboardingSession
 from app.models.boards import Board
+from app.models.gateways import Gateway
 from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
+from app.models.task_dependencies import TaskDependency
+from app.models.task_fingerprints import TaskFingerprint
+from app.models.tasks import Task
 from app.models.users import User
+from app.schemas.common import OkResponse
 from app.schemas.organizations import (
     OrganizationActiveUpdate,
     OrganizationBoardAccessRead,
@@ -151,6 +163,82 @@ async def set_active_org(
 @router.get("/me", response_model=OrganizationRead)
 async def get_my_org(ctx: OrganizationContext = Depends(require_org_member)) -> OrganizationRead:
     return OrganizationRead.model_validate(ctx.organization, from_attributes=True)
+
+
+@router.delete("/me", response_model=OkResponse)
+async def delete_my_org(
+    session: AsyncSession = Depends(get_session),
+    ctx: OrganizationContext = Depends(require_org_admin),
+) -> OkResponse:
+    if ctx.member.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only organization owners can delete organizations",
+        )
+
+    org_id = ctx.organization.id
+    board_ids = select(Board.id).where(col(Board.organization_id) == org_id)
+    task_ids = select(Task.id).where(col(Task.board_id).in_(board_ids))
+    agent_ids = select(Agent.id).where(col(Agent.board_id).in_(board_ids))
+    member_ids = select(OrganizationMember.id).where(
+        col(OrganizationMember.organization_id) == org_id
+    )
+    invite_ids = select(OrganizationInvite.id).where(
+        col(OrganizationInvite.organization_id) == org_id
+    )
+    group_ids = select(BoardGroup.id).where(col(BoardGroup.organization_id) == org_id)
+
+    await session.execute(delete(ActivityEvent).where(col(ActivityEvent.task_id).in_(task_ids)))
+    await session.execute(delete(ActivityEvent).where(col(ActivityEvent.agent_id).in_(agent_ids)))
+    await session.execute(delete(TaskDependency).where(col(TaskDependency.board_id).in_(board_ids)))
+    await session.execute(
+        delete(TaskFingerprint).where(col(TaskFingerprint.board_id).in_(board_ids))
+    )
+    await session.execute(delete(Approval).where(col(Approval.board_id).in_(board_ids)))
+    await session.execute(delete(BoardMemory).where(col(BoardMemory.board_id).in_(board_ids)))
+    await session.execute(
+        delete(BoardOnboardingSession).where(col(BoardOnboardingSession.board_id).in_(board_ids))
+    )
+    await session.execute(
+        delete(OrganizationBoardAccess).where(col(OrganizationBoardAccess.board_id).in_(board_ids))
+    )
+    await session.execute(
+        delete(OrganizationInviteBoardAccess).where(
+            col(OrganizationInviteBoardAccess.board_id).in_(board_ids)
+        )
+    )
+    await session.execute(
+        delete(OrganizationBoardAccess).where(
+            col(OrganizationBoardAccess.organization_member_id).in_(member_ids)
+        )
+    )
+    await session.execute(
+        delete(OrganizationInviteBoardAccess).where(
+            col(OrganizationInviteBoardAccess.organization_invite_id).in_(invite_ids)
+        )
+    )
+    await session.execute(delete(Task).where(col(Task.board_id).in_(board_ids)))
+    await session.execute(delete(Agent).where(col(Agent.board_id).in_(board_ids)))
+    await session.execute(delete(Board).where(col(Board.organization_id) == org_id))
+    await session.execute(
+        delete(BoardGroupMemory).where(col(BoardGroupMemory.board_group_id).in_(group_ids))
+    )
+    await session.execute(delete(BoardGroup).where(col(BoardGroup.organization_id) == org_id))
+    await session.execute(delete(Gateway).where(col(Gateway.organization_id) == org_id))
+    await session.execute(
+        delete(OrganizationInvite).where(col(OrganizationInvite.organization_id) == org_id)
+    )
+    await session.execute(
+        delete(OrganizationMember).where(col(OrganizationMember.organization_id) == org_id)
+    )
+    await session.execute(
+        update(User)
+        .where(col(User.active_organization_id) == org_id)
+        .values(active_organization_id=None)
+    )
+    await session.execute(delete(Organization).where(col(Organization.id) == org_id))
+    await session.commit()
+    return OkResponse()
 
 
 @router.get("/me/member", response_model=OrganizationMemberRead)
