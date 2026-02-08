@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
 
 import { ApiError } from "@/api/mutator";
 import {
@@ -246,11 +247,7 @@ export default function GatewaysPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {gatewaysQuery.isLoading ? (
-                <tr>
-                  <td colSpan={columns.length} className="px-6 py-8">
-                    <span className="text-sm text-slate-500">Loading…</span>
-                  </td>
-                </tr>
+                <TableLoadingRow colSpan={columns.length} />
               ) : table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50">
@@ -265,49 +262,27 @@ export default function GatewaysPage() {
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={columns.length} className="px-6 py-16">
-                    <div className="flex flex-col items-center justify-center text-center">
-                      <div className="mb-4 rounded-full bg-slate-50 p-4">
-                        <svg
-                          className="h-16 w-16 text-slate-300"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <rect
-                            x="2"
-                            y="7"
-                            width="20"
-                            height="14"
-                            rx="2"
-                            ry="2"
-                          />
-                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                        </svg>
-                      </div>
-                      <h3 className="mb-2 text-lg font-semibold text-slate-900">
-                        No gateways yet
-                      </h3>
-                      <p className="mb-6 max-w-md text-sm text-slate-500">
-                        Create your first gateway to connect boards and start
-                        managing your OpenClaw connections.
-                      </p>
-                      <Link
-                        href="/gateways/new"
-                        className={buttonVariants({
-                          size: "md",
-                          variant: "primary",
-                        })}
-                      >
-                        Create your first gateway
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
+                <TableEmptyStateRow
+                  colSpan={columns.length}
+                  icon={
+                    <svg
+                      className="h-16 w-16 text-slate-300"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                    </svg>
+                  }
+                  title="No gateways yet"
+                  description="Create your first gateway to connect boards and start managing your OpenClaw connections."
+                  actionHref="/gateways/new"
+                  actionLabel="Create your first gateway"
+                />
               )}
             </tbody>
           </table>

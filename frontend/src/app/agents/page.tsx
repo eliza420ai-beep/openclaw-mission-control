@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
 
 import { ApiError } from "@/api/mutator";
 import {
@@ -291,11 +292,7 @@ export default function AgentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {agentsQuery.isLoading ? (
-                  <tr>
-                    <td colSpan={columns.length} className="px-6 py-8">
-                      <span className="text-sm text-slate-500">Loading…</span>
-                    </td>
-                  </tr>
+                  <TableLoadingRow colSpan={columns.length} />
                 ) : table.getRowModel().rows.length ? (
                   table.getRowModel().rows.map((row) => (
                     <tr key={row.id} className="hover:bg-slate-50">
@@ -310,44 +307,29 @@ export default function AgentsPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td colSpan={columns.length} className="px-6 py-16">
-                      <div className="flex flex-col items-center justify-center text-center">
-                        <div className="mb-4 rounded-full bg-slate-50 p-4">
-                          <svg
-                            className="h-16 w-16 text-slate-300"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                            <circle cx="9" cy="7" r="4" />
-                            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                          </svg>
-                        </div>
-                        <h3 className="mb-2 text-lg font-semibold text-slate-900">
-                          No agents yet
-                        </h3>
-                        <p className="mb-6 max-w-md text-sm text-slate-500">
-                          Create your first agent to start executing tasks on
-                          this board.
-                        </p>
-                        <Link
-                          href="/agents/new"
-                          className={buttonVariants({
-                            size: "md",
-                            variant: "primary",
-                          })}
-                        >
-                          Create your first agent
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
+                  <TableEmptyStateRow
+                    colSpan={columns.length}
+                    icon={
+                      <svg
+                        className="h-16 w-16 text-slate-300"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    }
+                    title="No agents yet"
+                    description="Create your first agent to start executing tasks on this board."
+                    actionHref="/agents/new"
+                    actionLabel="Create your first agent"
+                  />
                 )}
               </tbody>
             </table>

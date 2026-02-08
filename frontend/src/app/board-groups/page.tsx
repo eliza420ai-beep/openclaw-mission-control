@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
 import { formatTimestamp } from "@/lib/formatters";
+import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
 
 export default function BoardGroupsPage() {
   const { isSignedIn } = useAuth();
@@ -235,13 +236,7 @@ export default function BoardGroupsPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {groupsQuery.isLoading ? (
-                      <tr>
-                        <td colSpan={columns.length} className="px-6 py-8">
-                          <span className="text-sm text-slate-500">
-                            Loading…
-                          </span>
-                        </td>
-                      </tr>
+                      <TableLoadingRow colSpan={columns.length} />
                     ) : table.getRowModel().rows.length ? (
                       table.getRowModel().rows.map((row) => (
                         <tr
@@ -259,45 +254,30 @@ export default function BoardGroupsPage() {
                         </tr>
                       ))
                     ) : (
-                      <tr>
-                        <td colSpan={columns.length} className="px-6 py-16">
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <div className="mb-4 rounded-full bg-slate-50 p-4">
-                              <svg
-                                className="h-16 w-16 text-slate-300"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M3 7h8" />
-                                <path d="M3 17h8" />
-                                <path d="M13 7h8" />
-                                <path d="M13 17h8" />
-                                <path d="M3 12h18" />
-                              </svg>
-                            </div>
-                            <h3 className="mb-2 text-lg font-semibold text-slate-900">
-                              No groups yet
-                            </h3>
-                            <p className="mb-6 max-w-md text-sm text-slate-500">
-                              Create a board group to increase cross-board
-                              visibility for agents.
-                            </p>
-                            <Link
-                              href="/board-groups/new"
-                              className={buttonVariants({
-                                size: "md",
-                                variant: "primary",
-                              })}
-                            >
-                              Create your first group
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
+                      <TableEmptyStateRow
+                        colSpan={columns.length}
+                        icon={
+                          <svg
+                            className="h-16 w-16 text-slate-300"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M3 7h8" />
+                            <path d="M3 17h8" />
+                            <path d="M13 7h8" />
+                            <path d="M13 17h8" />
+                            <path d="M3 12h18" />
+                          </svg>
+                        }
+                        title="No groups yet"
+                        description="Create a board group to increase cross-board visibility for agents."
+                        actionHref="/board-groups/new"
+                        actionLabel="Create your first group"
+                      />
                     )}
                   </tbody>
                 </table>

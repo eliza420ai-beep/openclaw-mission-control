@@ -40,6 +40,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SignedOutPanel } from "@/components/auth/SignedOutPanel";
+import { TableEmptyStateRow, TableLoadingRow } from "@/components/ui/table-state";
 
 const compactId = (value: string) =>
   value.length > 8 ? `${value.slice(0, 8)}…` : value;
@@ -290,13 +291,7 @@ export default function BoardsPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {boardsQuery.isLoading ? (
-                      <tr>
-                        <td colSpan={columns.length} className="px-6 py-8">
-                          <span className="text-sm text-slate-500">
-                            Loading…
-                          </span>
-                        </td>
-                      </tr>
+                      <TableLoadingRow colSpan={columns.length} />
                     ) : table.getRowModel().rows.length ? (
                       table.getRowModel().rows.map((row) => (
                         <tr
@@ -314,44 +309,29 @@ export default function BoardsPage() {
                         </tr>
                       ))
                     ) : (
-                      <tr>
-                        <td colSpan={columns.length} className="px-6 py-16">
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <div className="mb-4 rounded-full bg-slate-50 p-4">
-                              <svg
-                                className="h-16 w-16 text-slate-300"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect x="3" y="3" width="7" height="7" />
-                                <rect x="14" y="3" width="7" height="7" />
-                                <rect x="14" y="14" width="7" height="7" />
-                                <rect x="3" y="14" width="7" height="7" />
-                              </svg>
-                            </div>
-                            <h3 className="mb-2 text-lg font-semibold text-slate-900">
-                              No boards yet
-                            </h3>
-                            <p className="mb-6 max-w-md text-sm text-slate-500">
-                              Create your first board to start routing tasks and
-                              monitoring work across agents.
-                            </p>
-                            <Link
-                              href="/boards/new"
-                              className={buttonVariants({
-                                size: "md",
-                                variant: "primary",
-                              })}
-                            >
-                              Create your first board
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
+                      <TableEmptyStateRow
+                        colSpan={columns.length}
+                        icon={
+                          <svg
+                            className="h-16 w-16 text-slate-300"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                          </svg>
+                        }
+                        title="No boards yet"
+                        description="Create your first board to start routing tasks and monitoring work across agents."
+                        actionHref="/boards/new"
+                        actionLabel="Create your first board"
+                      />
                     )}
                   </tbody>
                 </table>
