@@ -23,11 +23,7 @@ from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import async_session_maker, get_session
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import (
-    OpenClawGatewayError,
-    ensure_session,
-    send_message,
-)
+from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.boards import Board
@@ -154,7 +150,8 @@ async def _require_board(
     board = await Board.objects.by_id(board_id).first(session)
     if board is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Board not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found",
         )
     if user is not None:
         await require_board_access(session, user=user, board=board, write=write)
@@ -162,7 +159,8 @@ async def _require_board(
 
 
 async def _require_gateway(
-    session: AsyncSession, board: Board,
+    session: AsyncSession,
+    board: Board,
 ) -> tuple[Gateway, GatewayClientConfig]:
     if not board.gateway_id:
         raise HTTPException(
@@ -246,7 +244,8 @@ def _coerce_agent_items(items: Sequence[Any]) -> list[Agent]:
 
 
 async def _find_gateway_for_main_session(
-    session: AsyncSession, session_key: str | None,
+    session: AsyncSession,
+    session_key: str | None,
 ) -> Gateway | None:
     if not session_key:
         return None
@@ -306,7 +305,8 @@ async def _fetch_agent_events(
 
 
 async def _require_user_context(
-    session: AsyncSession, user: User | None,
+    session: AsyncSession,
+    user: User | None,
 ) -> OrganizationContext:
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
@@ -332,7 +332,8 @@ async def _require_agent_access(
         if not is_org_admin(ctx.member):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
         gateway = await _find_gateway_for_main_session(
-            session, agent.openclaw_session_id,
+            session,
+            agent.openclaw_session_id,
         )
         if gateway is None or gateway.organization_id != ctx.organization.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -355,7 +356,10 @@ def _record_heartbeat(session: AsyncSession, agent: Agent) -> None:
 
 
 def _record_instruction_failure(
-    session: AsyncSession, agent: Agent, error: str, action: str,
+    session: AsyncSession,
+    agent: Agent,
+    error: str,
+    action: str,
 ) -> None:
     action_label = action.replace("_", " ").capitalize()
     record_activity(
@@ -432,10 +436,7 @@ async def _ensure_unique_agent_name(
     if existing_gateway:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "An agent with this name already exists in this gateway "
-                "workspace."
-            ),
+            detail=("An agent with this name already exists in this gateway " "workspace."),
         )
 
     desired_session_key = _build_session_key(requested_name)
@@ -938,7 +939,9 @@ async def _commit_heartbeat(
 
 
 async def _send_wakeup_message(
-    agent: Agent, config: GatewayClientConfig, verb: str = "provisioned",
+    agent: Agent,
+    config: GatewayClientConfig,
+    verb: str = "provisioned",
 ) -> None:
     session_key = agent.openclaw_session_id or _build_session_key(agent.name)
     await ensure_session(session_key, config=config, label=agent.name)
@@ -971,7 +974,8 @@ async def list_agents(
                 col(Gateway.organization_id) == ctx.organization.id,
             )
             base_filter = or_(
-                base_filter, col(Agent.openclaw_session_id).in_(gateway_keys),
+                base_filter,
+                col(Agent.openclaw_session_id).in_(gateway_keys),
             )
         statement = select(Agent).where(base_filter)
     if board_id is not None:
@@ -987,10 +991,7 @@ async def list_agents(
 
     def _transform(items: Sequence[Any]) -> Sequence[Any]:
         agents = _coerce_agent_items(items)
-        return [
-            _to_agent_read(_with_computed_status(agent), main_session_keys)
-            for agent in agents
-        ]
+        return [_to_agent_read(_with_computed_status(agent), main_session_keys) for agent in agents]
 
     return await paginate(session, statement, transformer=_transform)
 
@@ -1019,19 +1020,17 @@ async def stream_agents(
             async with async_session_maker() as stream_session:
                 if board_id is not None:
                     agents = await _fetch_agent_events(
-                        stream_session, board_id, last_seen,
+                        stream_session,
+                        board_id,
+                        last_seen,
                     )
                 elif allowed_ids:
                     agents = await _fetch_agent_events(stream_session, None, last_seen)
-                    agents = [
-                        agent for agent in agents if agent.board_id in allowed_ids
-                    ]
+                    agents = [agent for agent in agents if agent.board_id in allowed_ids]
                 else:
                     agents = []
                 main_session_keys = (
-                    await _get_gateway_main_session_keys(stream_session)
-                    if agents
-                    else set()
+                    await _get_gateway_main_session_keys(stream_session) if agents else set()
                 )
             for agent in agents:
                 updated_at = agent.updated_at or agent.last_seen_at or utcnow()
@@ -1252,7 +1251,8 @@ async def delete_agent(
     await _require_agent_access(session, agent=agent, ctx=ctx, write=True)
 
     board = await _require_board(
-        session, str(agent.board_id) if agent.board_id else None,
+        session,
+        str(agent.board_id) if agent.board_id else None,
     )
     gateway, client_config = await _require_gateway(session, board)
     try:

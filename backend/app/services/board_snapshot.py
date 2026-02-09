@@ -55,8 +55,7 @@ def _agent_to_read(agent: Agent, main_session_keys: set[str]) -> AgentRead:
     model = AgentRead.model_validate(agent, from_attributes=True)
     computed_status = _computed_agent_status(agent)
     is_gateway_main = bool(
-        agent.openclaw_session_id
-        and agent.openclaw_session_id in main_session_keys,
+        agent.openclaw_session_id and agent.openclaw_session_id in main_session_keys,
     )
     return model.model_copy(
         update={
@@ -84,11 +83,7 @@ def _task_to_card(
 ) -> TaskCardRead:
     card = TaskCardRead.model_validate(task, from_attributes=True)
     approvals_count, approvals_pending_count = counts_by_task_id.get(task.id, (0, 0))
-    assignee = (
-        agent_name_by_id.get(task.assigned_agent_id)
-        if task.assigned_agent_id
-        else None
-    )
+    assignee = agent_name_by_id.get(task.assigned_agent_id) if task.assigned_agent_id else None
     depends_on_task_ids = deps_by_task_id.get(task.id, [])
     blocked_by_task_ids = blocked_by_dependency_ids(
         dependency_ids=depends_on_task_ids,

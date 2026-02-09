@@ -104,7 +104,9 @@ async def _require_gateway_for_create(
     session: AsyncSession = SESSION_DEP,
 ) -> Gateway:
     return await _require_gateway(
-        session, payload.gateway_id, organization_id=ctx.organization.id,
+        session,
+        payload.gateway_id,
+        organization_id=ctx.organization.id,
     )
 
 
@@ -155,7 +157,9 @@ async def _apply_board_update(
     updates = payload.model_dump(exclude_unset=True)
     if "gateway_id" in updates:
         await _require_gateway(
-            session, updates["gateway_id"], organization_id=board.organization_id,
+            session,
+            updates["gateway_id"],
+            organization_id=board.organization_id,
         )
     if "board_group_id" in updates and updates["board_group_id"] is not None:
         await _require_board_group(
@@ -164,10 +168,7 @@ async def _apply_board_update(
             organization_id=board.organization_id,
         )
     crud.apply_updates(board, updates)
-    if (
-        updates.get("board_type") == "goal"
-        and (not board.objective or not board.success_metrics)
-    ):
+    if updates.get("board_type") == "goal" and (not board.objective or not board.success_metrics):
         # Validate only when explicitly switching to goal boards.
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -183,7 +184,8 @@ async def _apply_board_update(
 
 
 async def _board_gateway(
-    session: AsyncSession, board: Board,
+    session: AsyncSession,
+    board: Board,
 ) -> tuple[Gateway | None, GatewayClientConfig | None]:
     if not board.gateway_id:
         return None, None
@@ -255,7 +257,8 @@ async def list_boards(
     if board_group_id is not None:
         statement = statement.where(col(Board.board_group_id) == board_group_id)
     statement = statement.order_by(
-        func.lower(col(Board.name)).asc(), col(Board.created_at).desc(),
+        func.lower(col(Board.name)).asc(),
+        col(Board.created_at).desc(),
     )
     return await paginate(session, statement)
 
@@ -350,10 +353,14 @@ async def delete_board(
             commit=False,
         )
     await crud.delete_where(
-        session, TaskDependency, col(TaskDependency.board_id) == board.id,
+        session,
+        TaskDependency,
+        col(TaskDependency.board_id) == board.id,
     )
     await crud.delete_where(
-        session, TaskFingerprint, col(TaskFingerprint.board_id) == board.id,
+        session,
+        TaskFingerprint,
+        col(TaskFingerprint.board_id) == board.id,
     )
 
     # Approvals can reference tasks and agents, so delete before both.

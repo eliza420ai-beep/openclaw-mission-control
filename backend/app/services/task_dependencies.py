@@ -79,11 +79,7 @@ def blocked_by_dependency_ids(
     status_by_id: Mapping[UUID, str],
 ) -> list[UUID]:
     """Return dependency ids that are not yet in the done status."""
-    return [
-        dep_id
-        for dep_id in dependency_ids
-        if status_by_id.get(dep_id) != DONE_STATUS
-    ]
+    return [dep_id for dep_id in dependency_ids if status_by_id.get(dep_id) != DONE_STATUS]
 
 
 async def blocked_by_for_task(

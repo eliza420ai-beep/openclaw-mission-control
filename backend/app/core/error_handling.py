@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
@@ -44,9 +44,7 @@ class RequestIdMiddleware:
             if message["type"] == "http.response.start":
                 # Starlette uses `list[tuple[bytes, bytes]]` here.
                 headers: list[tuple[bytes, bytes]] = message.setdefault("headers", [])
-                if not any(
-                    key.lower() == self._header_name_bytes for key, _ in headers
-                ):
+                if not any(key.lower() == self._header_name_bytes for key, _ in headers):
                     request_id_bytes = request_id.encode("latin-1")
                     headers.append((self._header_name_bytes, request_id_bytes))
             await send(message)

@@ -8,8 +8,9 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import DateTime, case, func
+from sqlalchemy import DateTime, case
 from sqlalchemy import cast as sql_cast
+from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 

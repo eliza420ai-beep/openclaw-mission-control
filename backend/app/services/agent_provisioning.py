@@ -15,11 +15,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 
 from app.core.config import settings
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import (
-    OpenClawGatewayError,
-    ensure_session,
-    openclaw_call,
-)
+from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, openclaw_call
 
 if TYPE_CHECKING:
     from app.models.agents import Agent
@@ -414,7 +410,9 @@ async def _supported_gateway_files(config: GatewayClientConfig) -> set[str]:
         if not agent_id:
             return set(DEFAULT_GATEWAY_FILES)
         files_payload = await openclaw_call(
-            "agents.files.list", {"agentId": agent_id}, config=config,
+            "agents.files.list",
+            {"agentId": agent_id},
+            config=config,
         )
         if isinstance(files_payload, dict):
             files = files_payload.get("files") or []
@@ -438,11 +436,14 @@ async def _reset_session(session_key: str, config: GatewayClientConfig) -> None:
 
 
 async def _gateway_agent_files_index(
-    agent_id: str, config: GatewayClientConfig,
+    agent_id: str,
+    config: GatewayClientConfig,
 ) -> dict[str, dict[str, Any]]:
     try:
         payload = await openclaw_call(
-            "agents.files.list", {"agentId": agent_id}, config=config,
+            "agents.files.list",
+            {"agentId": agent_id},
+            config=config,
         )
         if isinstance(payload, dict):
             files = payload.get("files") or []
@@ -486,18 +487,14 @@ def _render_agent_files(
             )
             heartbeat_path = _templates_root() / heartbeat_template
             if heartbeat_path.exists():
-                rendered[name] = (
-                    env.get_template(heartbeat_template).render(**context).strip()
-                )
+                rendered[name] = env.get_template(heartbeat_template).render(**context).strip()
                 continue
         override = overrides.get(name)
         if override:
             rendered[name] = env.from_string(override).render(**context).strip()
             continue
         template_name = (
-            template_overrides[name]
-            if template_overrides and name in template_overrides
-            else name
+            template_overrides[name] if template_overrides and name in template_overrides else name
         )
         path = _templates_root() / template_name
         if path.exists():
@@ -596,8 +593,7 @@ def _heartbeat_entry_map(
     entries: list[tuple[str, str, dict[str, Any]]],
 ) -> dict[str, tuple[str, dict[str, Any]]]:
     return {
-        agent_id: (workspace_path, heartbeat)
-        for agent_id, workspace_path, heartbeat in entries
+        agent_id: (workspace_path, heartbeat) for agent_id, workspace_path, heartbeat in entries
     }
 
 
@@ -694,9 +690,7 @@ async def _remove_gateway_agent_list(
         raise OpenClawGatewayError(msg)
 
     new_list = [
-        entry
-        for entry in lst
-        if not (isinstance(entry, dict) and entry.get("id") == agent_id)
+        entry for entry in lst if not (isinstance(entry, dict) and entry.get("id") == agent_id)
     ]
     if len(new_list) == len(lst):
         return
@@ -841,7 +835,9 @@ async def provision_main_agent(
         raise ValueError(msg)
     client_config = GatewayClientConfig(url=gateway.url, token=gateway.token)
     await ensure_session(
-        gateway.main_session_key, config=client_config, label="Main Agent",
+        gateway.main_session_key,
+        config=client_config,
+        label="Main Agent",
     )
 
     agent_id = await _gateway_default_agent_id(

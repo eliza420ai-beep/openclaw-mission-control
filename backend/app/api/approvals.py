@@ -24,12 +24,7 @@ from app.core.time import utcnow
 from app.db.pagination import paginate
 from app.db.session import async_session_maker, get_session
 from app.models.approvals import Approval
-from app.schemas.approvals import (
-    ApprovalCreate,
-    ApprovalRead,
-    ApprovalStatus,
-    ApprovalUpdate,
-)
+from app.schemas.approvals import ApprovalCreate, ApprovalRead, ApprovalStatus, ApprovalUpdate
 from app.schemas.pagination import DefaultLimitOffsetPage
 
 if TYPE_CHECKING:
@@ -156,9 +151,7 @@ async def stream_approvals(
                     ).one(),
                 )
                 task_ids = {
-                    approval.task_id
-                    for approval in approvals
-                    if approval.task_id is not None
+                    approval.task_id for approval in approvals if approval.task_id is not None
                 }
                 counts_by_task_id: dict[UUID, tuple[int, int]] = {}
                 if task_ids:

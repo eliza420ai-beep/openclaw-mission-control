@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, Field
@@ -11,6 +12,9 @@ from app.core.error_handling import (
     REQUEST_ID_HEADER,
     _error_payload,
     _get_request_id,
+    _http_exception_exception_handler,
+    _request_validation_exception_handler,
+    _response_validation_exception_handler,
     install_error_handling,
 )
 
@@ -123,3 +127,24 @@ def test_get_request_id_returns_none_for_missing_or_invalid_state() -> None:
 
 def test_error_payload_omits_request_id_when_none() -> None:
     assert _error_payload(detail="x", request_id=None) == {"detail": "x"}
+
+
+@pytest.mark.asyncio
+async def test_request_validation_exception_wrapper_rejects_wrong_exception() -> None:
+    req = Request({"type": "http", "headers": [], "state": {}})
+    with pytest.raises(TypeError, match="Expected RequestValidationError"):
+        await _request_validation_exception_handler(req, Exception("x"))
+
+
+@pytest.mark.asyncio
+async def test_response_validation_exception_wrapper_rejects_wrong_exception() -> None:
+    req = Request({"type": "http", "headers": [], "state": {}})
+    with pytest.raises(TypeError, match="Expected ResponseValidationError"):
+        await _response_validation_exception_handler(req, Exception("x"))
+
+
+@pytest.mark.asyncio
+async def test_http_exception_wrapper_rejects_wrong_exception() -> None:
+    req = Request({"type": "http", "headers": [], "state": {}})
+    with pytest.raises(TypeError, match="Expected StarletteHTTPException"):
+        await _http_exception_exception_handler(req, Exception("x"))

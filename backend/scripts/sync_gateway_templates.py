@@ -32,17 +32,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--reset-sessions",
         action="store_true",
-        help=(
-            "Reset agent sessions after syncing files "
-            "(forces agents to re-read workspace)"
-        ),
+        help=("Reset agent sessions after syncing files " "(forces agents to re-read workspace)"),
     )
     parser.add_argument(
         "--rotate-tokens",
         action="store_true",
         help=(
-            "Rotate agent tokens when TOOLS.md is missing/unreadable "
-            "or token drift is detected"
+            "Rotate agent tokens when TOOLS.md is missing/unreadable " "or token drift is detected"
         ),
     )
     parser.add_argument(
@@ -56,10 +52,7 @@ def _parse_args() -> argparse.Namespace:
 async def _run() -> int:
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
-    from app.services.template_sync import (
-        GatewayTemplateSyncOptions,
-        sync_gateway_templates,
-    )
+    from app.services.template_sync import GatewayTemplateSyncOptions, sync_gateway_templates
 
     args = _parse_args()
     gateway_id = UUID(args.gateway_id)
@@ -86,8 +79,7 @@ async def _run() -> int:
 
     sys.stdout.write(f"gateway_id={result.gateway_id}\n")
     sys.stdout.write(
-        f"include_main={result.include_main} "
-        f"reset_sessions={result.reset_sessions}\n",
+        f"include_main={result.include_main} " f"reset_sessions={result.reset_sessions}\n",
     )
     sys.stdout.write(
         f"agents_updated={result.agents_updated} "

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from app.models.agents import Agent
 
 # Mention tokens are single, space-free words (e.g. "@alex", "@lead").

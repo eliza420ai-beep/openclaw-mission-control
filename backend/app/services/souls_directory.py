@@ -42,10 +42,7 @@ class SoulRef:
 def _parse_sitemap_soul_refs(sitemap_xml: str) -> list[SoulRef]:
     """Parse sitemap XML and extract valid souls.directory handle/slug refs."""
     # Extract <loc> values without XML entity expansion.
-    urls = [
-        unescape(match.group(1)).strip()
-        for match in _LOC_PATTERN.finditer(sitemap_xml)
-    ]
+    urls = [unescape(match.group(1)).strip() for match in _LOC_PATTERN.finditer(sitemap_xml)]
 
     refs: list[SoulRef] = []
     for url in urls:
@@ -110,10 +107,7 @@ async def fetch_soul_markdown(
     normalized_slug = slug.strip().strip("/")
     if normalized_slug.endswith(".md"):
         normalized_slug = normalized_slug[: -len(".md")]
-    url = (
-        f"{SOULS_DIRECTORY_BASE_URL}/api/souls/"
-        f"{normalized_handle}/{normalized_slug}.md"
-    )
+    url = f"{SOULS_DIRECTORY_BASE_URL}/api/souls/" f"{normalized_handle}/{normalized_slug}.md"
 
     owns_client = client is None
     if client is None:

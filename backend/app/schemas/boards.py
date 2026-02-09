@@ -9,9 +9,7 @@ from uuid import UUID
 from pydantic import model_validator
 from sqlmodel import SQLModel
 
-_ERR_GOAL_FIELDS_REQUIRED = (
-    "Confirmed goal boards require objective and success_metrics"
-)
+_ERR_GOAL_FIELDS_REQUIRED = "Confirmed goal boards require objective and success_metrics"
 _ERR_GATEWAY_REQUIRED = "gateway_id is required"
 RUNTIME_ANNOTATION_TYPES = (datetime, UUID)
 

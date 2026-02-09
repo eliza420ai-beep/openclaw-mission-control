@@ -14,11 +14,7 @@ from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.agent_tokens import (
-    generate_agent_token,
-    hash_agent_token,
-    verify_agent_token,
-)
+from app.core.agent_tokens import generate_agent_token, hash_agent_token, verify_agent_token
 from app.core.time import utcnow
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import OpenClawGatewayError, openclaw_call
@@ -108,10 +104,7 @@ def _is_transient_gateway_error(exc: Exception) -> bool:
 
 
 def _gateway_timeout_message(exc: OpenClawGatewayError) -> str:
-    return (
-        "Gateway unreachable after 10 minutes (template sync timeout). "
-        f"Last error: {exc}"
-    )
+    return "Gateway unreachable after 10 minutes (template sync timeout). " f"Last error: {exc}"
 
 
 class _GatewayBackoff:
@@ -375,6 +368,7 @@ async def _rotate_agent_token(session: AsyncSession, agent: Agent) -> str:
 
 async def _ping_gateway(ctx: _SyncContext, result: GatewayTemplatesSyncResult) -> bool:
     try:
+
         async def _do_ping() -> object:
             return await openclaw_call("agents.list", config=ctx.config)
 
@@ -486,6 +480,7 @@ async def _sync_one_agent(
     if not auth_token:
         return False
     try:
+
         async def _do_provision() -> None:
             await provision_agent(
                 agent,
@@ -533,10 +528,7 @@ async def _sync_main_agent(
     if main_agent is None:
         _append_sync_error(
             result,
-            message=(
-                "Gateway main agent record not found; "
-                "skipping main agent template sync."
-            ),
+            message=("Gateway main agent record not found; " "skipping main agent template sync."),
         )
         return True
     try:
@@ -574,6 +566,7 @@ async def _sync_main_agent(
         return True
     stop_sync = False
     try:
+
         async def _do_provision_main() -> None:
             await provision_main_agent(
                 main_agent,

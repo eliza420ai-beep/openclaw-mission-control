@@ -10,11 +10,7 @@ from sqlmodel import col, select
 from app.core.agent_tokens import generate_agent_token, hash_agent_token
 from app.core.time import utcnow
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import (
-    OpenClawGatewayError,
-    ensure_session,
-    send_message,
-)
+from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.agents import Agent
 from app.services.agent_provisioning import (
     DEFAULT_HEARTBEAT_CONFIG,

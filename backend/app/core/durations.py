@@ -19,9 +19,7 @@ _MULTIPLIERS: dict[str, int] = {
 _MAX_SCHEDULE_SECONDS = 60 * 60 * 24 * 365 * 10
 
 _ERR_SCHEDULE_REQUIRED = "schedule is required"
-_ERR_SCHEDULE_INVALID = (
-    'Invalid schedule. Expected format like "10m", "1h", "2d", "1w".'
-)
+_ERR_SCHEDULE_INVALID = 'Invalid schedule. Expected format like "10m", "1h", "2d", "1w".'
 _ERR_SCHEDULE_NONPOSITIVE = "Schedule must be greater than 0."
 _ERR_SCHEDULE_TOO_LARGE = "Schedule is too large (max 10 years)."
 

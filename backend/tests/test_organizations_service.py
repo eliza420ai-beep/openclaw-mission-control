@@ -16,10 +16,7 @@ from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
 from app.models.organizations import Organization
 from app.models.users import User
-from app.schemas.organizations import (
-    OrganizationBoardAccessSpec,
-    OrganizationMemberAccessUpdate,
-)
+from app.schemas.organizations import OrganizationBoardAccessSpec, OrganizationMemberAccessUpdate
 from app.services import organizations
 
 
@@ -87,10 +84,7 @@ class _FakeSession:
 
 
 def test_normalize_invited_email_strips_and_lowercases() -> None:
-    assert (
-        organizations.normalize_invited_email("  Foo@Example.com  ")
-        == "foo@example.com"
-    )
+    assert organizations.normalize_invited_email("  Foo@Example.com  ") == "foo@example.com"
 
 
 @pytest.mark.parametrize(
@@ -128,7 +122,9 @@ async def test_ensure_member_for_user_returns_existing_membership(
 ) -> None:
     user = User(clerk_user_id="u1")
     existing = OrganizationMember(
-        organization_id=uuid4(), user_id=user.id, role="member",
+        organization_id=uuid4(),
+        user_id=user.id,
+        role="member",
     )
 
     async def _fake_get_active(_session: Any, _user: User) -> OrganizationMember:
@@ -161,11 +157,15 @@ async def test_ensure_member_for_user_accepts_pending_invite(
         return invite
 
     accepted = OrganizationMember(
-        organization_id=org_id, user_id=user.id, role="member",
+        organization_id=org_id,
+        user_id=user.id,
+        role="member",
     )
 
     async def _fake_accept(
-        _session: Any, _invite: OrganizationInvite, _user: User,
+        _session: Any,
+        _invite: OrganizationInvite,
+        _user: User,
     ) -> OrganizationMember:
         assert _invite is invite
         assert _user is user
@@ -216,7 +216,10 @@ async def test_has_board_access_denies_cross_org() -> None:
     board = Board(id=uuid4(), organization_id=uuid4(), name="b", slug="b")
     assert (
         await organizations.has_board_access(
-            session, member=member, board=board, write=False,
+            session,
+            member=member,
+            board=board,
+            write=False,
         )
         is False
     )
@@ -226,7 +229,10 @@ async def test_has_board_access_denies_cross_org() -> None:
 async def test_has_board_access_uses_org_board_access_row_read_and_write() -> None:
     org_id = uuid4()
     member = OrganizationMember(
-        id=uuid4(), organization_id=org_id, user_id=uuid4(), role="member",
+        id=uuid4(),
+        organization_id=org_id,
+        user_id=uuid4(),
+        role="member",
     )
     board = Board(id=uuid4(), organization_id=org_id, name="b", slug="b")
 
@@ -239,7 +245,10 @@ async def test_has_board_access_uses_org_board_access_row_read_and_write() -> No
     session = _FakeSession(exec_results=[_FakeExecResult(first_value=access)])
     assert (
         await organizations.has_board_access(
-            session, member=member, board=board, write=False,
+            session,
+            member=member,
+            board=board,
+            write=False,
         )
         is True
     )
@@ -253,7 +262,10 @@ async def test_has_board_access_uses_org_board_access_row_read_and_write() -> No
     session2 = _FakeSession(exec_results=[_FakeExecResult(first_value=access2)])
     assert (
         await organizations.has_board_access(
-            session2, member=member, board=board, write=False,
+            session2,
+            member=member,
+            board=board,
+            write=False,
         )
         is True
     )
@@ -267,7 +279,10 @@ async def test_has_board_access_uses_org_board_access_row_read_and_write() -> No
     session3 = _FakeSession(exec_results=[_FakeExecResult(first_value=access3)])
     assert (
         await organizations.has_board_access(
-            session3, member=member, board=board, write=True,
+            session3,
+            member=member,
+            board=board,
+            write=True,
         )
         is False
     )
@@ -288,7 +303,10 @@ async def test_require_board_access_raises_when_no_member(
     session = _FakeSession(exec_results=[])
     with pytest.raises(HTTPException) as exc:
         await organizations.require_board_access(
-            session, user=user, board=board, write=False,
+            session,
+            user=user,
+            board=board,
+            write=False,
         )
     assert exc.value.status_code == 403
 
@@ -298,24 +316,33 @@ async def test_apply_member_access_update_deletes_existing_and_adds_rows_when_no
     None
 ):
     member = OrganizationMember(
-        id=uuid4(), organization_id=uuid4(), user_id=uuid4(), role="member",
+        id=uuid4(),
+        organization_id=uuid4(),
+        user_id=uuid4(),
+        role="member",
     )
     update = OrganizationMemberAccessUpdate(
         all_boards_read=False,
         all_boards_write=False,
         board_access=[
             OrganizationBoardAccessSpec(
-                board_id=uuid4(), can_read=True, can_write=False,
+                board_id=uuid4(),
+                can_read=True,
+                can_write=False,
             ),
             OrganizationBoardAccessSpec(
-                board_id=uuid4(), can_read=True, can_write=True,
+                board_id=uuid4(),
+                can_read=True,
+                can_write=True,
             ),
         ],
     )
     session = _FakeSession(exec_results=[])
 
     await organizations.apply_member_access_update(
-        session, member=member, update=update,
+        session,
+        member=member,
+        update=update,
     )
 
     # delete statement executed once

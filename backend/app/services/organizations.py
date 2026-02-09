@@ -79,7 +79,8 @@ async def get_member(
 
 
 async def get_first_membership(
-    session: AsyncSession, user_id: UUID,
+    session: AsyncSession,
+    user_id: UUID,
 ) -> OrganizationMember | None:
     """Return the oldest membership for a user, if any."""
     return (
@@ -99,7 +100,8 @@ async def set_active_organization(
     member = await get_member(session, user_id=user.id, organization_id=organization_id)
     if member is None:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="No org access",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No org access",
         )
     if user.active_organization_id != organization_id:
         user.active_organization_id = organization_id
@@ -177,8 +179,7 @@ async def accept_invite(
         access_rows = list(
             await session.exec(
                 select(OrganizationInviteBoardAccess).where(
-                    col(OrganizationInviteBoardAccess.organization_invite_id)
-                    == invite.id,
+                    col(OrganizationInviteBoardAccess.organization_invite_id) == invite.id,
                 ),
             ),
         )
@@ -207,7 +208,8 @@ async def accept_invite(
 
 
 async def ensure_member_for_user(
-    session: AsyncSession, user: User,
+    session: AsyncSession,
+    user: User,
 ) -> OrganizationMember:
     """Ensure a user has some membership, creating one if necessary."""
     existing = await get_active_membership(session, user)
@@ -291,21 +293,27 @@ async def require_board_access(
 ) -> OrganizationMember:
     """Require board access for a user and return matching membership."""
     member = await get_member(
-        session, user_id=user.id, organization_id=board.organization_id,
+        session,
+        user_id=user.id,
+        organization_id=board.organization_id,
     )
     if member is None:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="No org access",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No org access",
         )
     if not await has_board_access(session, member=member, board=board, write=write):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Board access denied",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Board access denied",
         )
     return member
 
 
 def board_access_filter(
-    member: OrganizationMember, *, write: bool,
+    member: OrganizationMember,
+    *,
+    write: bool,
 ) -> ColumnElement[bool]:
     """Build a SQL filter expression for boards visible to a member."""
     if write and member_all_boards_write(member):

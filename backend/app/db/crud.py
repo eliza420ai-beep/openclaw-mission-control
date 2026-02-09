@@ -161,10 +161,7 @@ async def list_by(
 
 async def exists(session: AsyncSession, model: type[ModelT], **lookup: object) -> bool:
     """Return whether any object exists for lookup values."""
-    return (
-        (await session.exec(_lookup_statement(model, lookup).limit(1))).first()
-        is not None
-    )
+    return (await session.exec(_lookup_statement(model, lookup).limit(1))).first() is not None
 
 
 def _criteria_statement(
@@ -219,11 +216,7 @@ async def update_where(
     commit = bool(options.pop("commit", False))
     exclude_none = bool(options.pop("exclude_none", False))
     allowed_fields_raw = options.pop("allowed_fields", None)
-    allowed_fields = (
-        allowed_fields_raw
-        if isinstance(allowed_fields_raw, set)
-        else None
-    )
+    allowed_fields = allowed_fields_raw if isinstance(allowed_fields_raw, set) else None
     source_updates: dict[str, Any] = {}
     if updates:
         source_updates.update(dict(updates))
@@ -276,11 +269,7 @@ async def patch(
     """Apply partial updates and persist object."""
     exclude_none = bool(options.pop("exclude_none", False))
     allowed_fields_raw = options.pop("allowed_fields", None)
-    allowed_fields = (
-        allowed_fields_raw
-        if isinstance(allowed_fields_raw, set)
-        else None
-    )
+    allowed_fields = allowed_fields_raw if isinstance(allowed_fields_raw, set) else None
     commit = bool(options.pop("commit", True))
     refresh = bool(options.pop("refresh", True))
     apply_updates(

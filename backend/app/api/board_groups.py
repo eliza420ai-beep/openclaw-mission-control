@@ -10,12 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlmodel import col, select
 
-from app.api.deps import (
-    ActorContext,
-    require_admin_or_agent,
-    require_org_admin,
-    require_org_member,
-)
+from app.api.deps import ActorContext, require_admin_or_agent, require_org_admin, require_org_member
 from app.core.time import utcnow
 from app.db import crud
 from app.db.pagination import paginate
@@ -34,10 +29,7 @@ from app.schemas.board_groups import BoardGroupCreate, BoardGroupRead, BoardGrou
 from app.schemas.common import OkResponse
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.schemas.view_models import BoardGroupSnapshot
-from app.services.agent_provisioning import (
-    DEFAULT_HEARTBEAT_CONFIG,
-    sync_gateway_agent_heartbeats,
-)
+from app.services.agent_provisioning import DEFAULT_HEARTBEAT_CONFIG, sync_gateway_agent_heartbeats
 from app.services.board_group_snapshot import build_group_snapshot
 from app.services.organizations import (
     OrganizationContext,
@@ -86,8 +78,7 @@ async def _require_group_access(
         return group
 
     board_ids = [
-        board.id
-        for board in await Board.objects.filter_by(board_group_id=group_id).all(session)
+        board.id for board in await Board.objects.filter_by(board_group_id=group_id).all(session)
     ]
     if not board_ids:
         if is_org_admin(member):
@@ -144,7 +135,10 @@ async def get_board_group(
 ) -> BoardGroup:
     """Get a board group by id."""
     return await _require_group_access(
-        session, group_id=group_id, member=ctx.member, write=False,
+        session,
+        group_id=group_id,
+        member=ctx.member,
+        write=False,
     )
 
 
@@ -159,7 +153,10 @@ async def get_board_group_snapshot(
 ) -> BoardGroupSnapshot:
     """Get a snapshot across boards in a group."""
     group = await _require_group_access(
-        session, group_id=group_id, member=ctx.member, write=False,
+        session,
+        group_id=group_id,
+        member=ctx.member,
+        write=False,
     )
     if per_board_task_limit < 0:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -174,9 +171,7 @@ async def get_board_group_snapshot(
         allowed_ids = set(
             await list_accessible_board_ids(session, member=ctx.member, write=False),
         )
-        snapshot.boards = [
-            item for item in snapshot.boards if item.board.id in allowed_ids
-        ]
+        snapshot.boards = [item for item in snapshot.boards if item.board.id in allowed_ids]
     return snapshot
 
 
@@ -339,14 +334,13 @@ async def update_board_group(
 ) -> BoardGroup:
     """Update a board group."""
     group = await _require_group_access(
-        session, group_id=group_id, member=ctx.member, write=True,
+        session,
+        group_id=group_id,
+        member=ctx.member,
+        write=True,
     )
     updates = payload.model_dump(exclude_unset=True)
-    if (
-        "slug" in updates
-        and updates["slug"] is not None
-        and not updates["slug"].strip()
-    ):
+    if "slug" in updates and updates["slug"] is not None and not updates["slug"].strip():
         updates["slug"] = _slugify(updates.get("name") or group.name)
     updates["updated_at"] = utcnow()
     return await crud.patch(session, group, updates)
@@ -360,7 +354,10 @@ async def delete_board_group(
 ) -> OkResponse:
     """Delete a board group."""
     await _require_group_access(
-        session, group_id=group_id, member=ctx.member, write=True,
+        session,
+        group_id=group_id,
+        member=ctx.member,
+        write=True,
     )
 
     # Boards reference groups, so clear the FK first to keep deletes simple.
@@ -378,7 +375,10 @@ async def delete_board_group(
         commit=False,
     )
     await crud.delete_where(
-        session, BoardGroup, col(BoardGroup.id) == group_id, commit=False,
+        session,
+        BoardGroup,
+        col(BoardGroup.id) == group_id,
+        commit=False,
     )
     await session.commit()
     return OkResponse()

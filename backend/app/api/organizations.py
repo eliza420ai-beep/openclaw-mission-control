@@ -80,7 +80,8 @@ ORG_ADMIN_DEP = Depends(require_org_admin)
 
 
 def _member_to_read(
-    member: OrganizationMember, user: User | None,
+    member: OrganizationMember,
+    user: User | None,
 ) -> OrganizationMemberRead:
     model = OrganizationMemberRead.model_validate(member, from_attributes=True)
     if user is not None:
@@ -167,9 +168,7 @@ async def list_my_organizations(
 
     await get_active_membership(session, auth.user)
     db_user = await User.objects.by_id(auth.user.id).first(session)
-    active_id = (
-        db_user.active_organization_id if db_user else auth.user.active_organization_id
-    )
+    active_id = db_user.active_organization_id if db_user else auth.user.active_organization_id
 
     statement = (
         select(Organization, OrganizationMember)
@@ -202,7 +201,9 @@ async def set_active_org(
     if auth.user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     member = await set_active_organization(
-        session, user=auth.user, organization_id=payload.organization_id,
+        session,
+        user=auth.user,
+        organization_id=payload.organization_id,
     )
     organization = await Organization.objects.by_id(member.organization_id).first(
         session,
@@ -245,7 +246,10 @@ async def delete_my_org(
     group_ids = select(BoardGroup.id).where(col(BoardGroup.organization_id) == org_id)
 
     await crud.delete_where(
-        session, ActivityEvent, col(ActivityEvent.task_id).in_(task_ids), commit=False,
+        session,
+        ActivityEvent,
+        col(ActivityEvent.task_id).in_(task_ids),
+        commit=False,
     )
     await crud.delete_where(
         session,
@@ -266,10 +270,16 @@ async def delete_my_org(
         commit=False,
     )
     await crud.delete_where(
-        session, Approval, col(Approval.board_id).in_(board_ids), commit=False,
+        session,
+        Approval,
+        col(Approval.board_id).in_(board_ids),
+        commit=False,
     )
     await crud.delete_where(
-        session, BoardMemory, col(BoardMemory.board_id).in_(board_ids), commit=False,
+        session,
+        BoardMemory,
+        col(BoardMemory.board_id).in_(board_ids),
+        commit=False,
     )
     await crud.delete_where(
         session,
@@ -302,13 +312,22 @@ async def delete_my_org(
         commit=False,
     )
     await crud.delete_where(
-        session, Task, col(Task.board_id).in_(board_ids), commit=False,
+        session,
+        Task,
+        col(Task.board_id).in_(board_ids),
+        commit=False,
     )
     await crud.delete_where(
-        session, Agent, col(Agent.board_id).in_(board_ids), commit=False,
+        session,
+        Agent,
+        col(Agent.board_id).in_(board_ids),
+        commit=False,
     )
     await crud.delete_where(
-        session, Board, col(Board.organization_id) == org_id, commit=False,
+        session,
+        Board,
+        col(Board.organization_id) == org_id,
+        commit=False,
     )
     await crud.delete_where(
         session,
@@ -317,10 +336,16 @@ async def delete_my_org(
         commit=False,
     )
     await crud.delete_where(
-        session, BoardGroup, col(BoardGroup.organization_id) == org_id, commit=False,
+        session,
+        BoardGroup,
+        col(BoardGroup.organization_id) == org_id,
+        commit=False,
     )
     await crud.delete_where(
-        session, Gateway, col(Gateway.organization_id) == org_id, commit=False,
+        session,
+        Gateway,
+        col(Gateway.organization_id) == org_id,
+        commit=False,
     )
     await crud.delete_where(
         session,
@@ -342,7 +367,10 @@ async def delete_my_org(
         commit=False,
     )
     await crud.delete_where(
-        session, Organization, col(Organization.id) == org_id, commit=False,
+        session,
+        Organization,
+        col(Organization.id) == org_id,
+        commit=False,
     )
     await session.commit()
     return OkResponse()
@@ -360,14 +388,14 @@ async def get_my_membership(
     ).all(session)
     model = _member_to_read(ctx.member, user)
     model.board_access = [
-        OrganizationBoardAccessRead.model_validate(row, from_attributes=True)
-        for row in access_rows
+        OrganizationBoardAccessRead.model_validate(row, from_attributes=True) for row in access_rows
     ]
     return model
 
 
 @router.get(
-    "/me/members", response_model=DefaultLimitOffsetPage[OrganizationMemberRead],
+    "/me/members",
+    response_model=DefaultLimitOffsetPage[OrganizationMemberRead],
 )
 async def list_org_members(
     session: AsyncSession = SESSION_DEP,
@@ -410,8 +438,7 @@ async def get_org_member(
     ).all(session)
     model = _member_to_read(member, user)
     model.board_access = [
-        OrganizationBoardAccessRead.model_validate(row, from_attributes=True)
-        for row in access_rows
+        OrganizationBoardAccessRead.model_validate(row, from_attributes=True) for row in access_rows
     ]
     return model
 
@@ -529,9 +556,7 @@ async def remove_org_member(
             user.active_organization_id = fallback_membership
         else:
             user.active_organization_id = (
-                fallback_membership.organization_id
-                if fallback_membership is not None
-                else None
+                fallback_membership.organization_id if fallback_membership is not None else None
             )
         session.add(user)
 
@@ -540,7 +565,8 @@ async def remove_org_member(
 
 
 @router.get(
-    "/me/invites", response_model=DefaultLimitOffsetPage[OrganizationInviteRead],
+    "/me/invites",
+    response_model=DefaultLimitOffsetPage[OrganizationInviteRead],
 )
 async def list_org_invites(
     session: AsyncSession = SESSION_DEP,
@@ -607,7 +633,9 @@ async def create_org_invite(
         if valid_board_ids != board_ids:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
     await apply_invite_board_access(
-        session, invite=invite, entries=payload.board_access,
+        session,
+        invite=invite,
+        entries=payload.board_access,
     )
     await session.commit()
     await session.refresh(invite)

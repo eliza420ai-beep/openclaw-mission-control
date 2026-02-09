@@ -17,11 +17,7 @@ from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import get_session
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import (
-    OpenClawGatewayError,
-    ensure_session,
-    send_message,
-)
+from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.agents import Agent
 from app.models.gateways import Gateway
 from app.schemas.common import OkResponse
@@ -38,12 +34,8 @@ from app.services.agent_provisioning import (
     ProvisionOptions,
     provision_main_agent,
 )
-from app.services.template_sync import (
-    GatewayTemplateSyncOptions,
-)
-from app.services.template_sync import (
-    sync_gateway_templates as sync_gateway_templates_service,
-)
+from app.services.template_sync import GatewayTemplateSyncOptions
+from app.services.template_sync import sync_gateway_templates as sync_gateway_templates_service
 
 if TYPE_CHECKING:
     from fastapi_pagination.limit_offset import LimitOffsetPage
@@ -109,7 +101,8 @@ async def _require_gateway(
     )
     if gateway is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Gateway not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gateway not found",
         )
     return gateway
 

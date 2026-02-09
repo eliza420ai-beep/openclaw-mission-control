@@ -38,10 +38,7 @@ def _status_weight_expr() -> ColumnElement[int]:
 
 def _priority_weight_expr() -> ColumnElement[int]:
     """Return a SQL expression that sorts task priorities by configured order."""
-    whens = [
-        (col(Task.priority) == key, weight)
-        for key, weight in _PRIORITY_ORDER.items()
-    ]
+    whens = [(col(Task.priority) == key, weight) for key, weight in _PRIORITY_ORDER.items()]
     return case(*whens, else_=99)
 
 
@@ -106,11 +103,7 @@ async def _agent_names(
     tasks: list[Task],
 ) -> dict[UUID, str]:
     """Return agent names keyed by assigned agent ids in the provided tasks."""
-    assigned_ids = {
-        task.assigned_agent_id
-        for task in tasks
-        if task.assigned_agent_id is not None
-    }
+    assigned_ids = {task.assigned_agent_id for task in tasks if task.assigned_agent_id is not None}
     if not assigned_ids:
         return {}
     return dict(

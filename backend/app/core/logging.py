@@ -198,8 +198,7 @@ class AppLogger:
             formatter: logging.Formatter = JsonFormatter()
         else:
             formatter = KeyValueFormatter(
-                "%(asctime)s %(levelname)s %(name)s %(message)s "
-                "app=%(app)s version=%(version)s",
+                "%(asctime)s %(levelname)s %(name)s %(message)s " "app=%(app)s version=%(version)s",
             )
             if settings.log_use_utc:
                 formatter.converter = time.gmtime

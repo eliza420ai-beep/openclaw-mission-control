@@ -29,11 +29,7 @@ from app.db import crud
 from app.db.pagination import paginate
 from app.db.session import async_session_maker, get_session
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import (
-    OpenClawGatewayError,
-    ensure_session,
-    send_message,
-)
+from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.approvals import Approval
@@ -45,13 +41,7 @@ from app.models.tasks import Task
 from app.schemas.common import OkResponse
 from app.schemas.errors import BlockedTaskError
 from app.schemas.pagination import DefaultLimitOffsetPage
-from app.schemas.tasks import (
-    TaskCommentCreate,
-    TaskCommentRead,
-    TaskCreate,
-    TaskRead,
-    TaskUpdate,
-)
+from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
 from app.services.mentions import extract_mentions, matches_agent_mention
 from app.services.organizations import require_board_access
@@ -263,8 +253,7 @@ async def _reconcile_dependents_for_dependency_toggle(
                     event_type="task.status_changed",
                     task_id=dependent.id,
                     message=(
-                        "Task returned to inbox: dependency reopened "
-                        f"({dependency_task.title})."
+                        "Task returned to inbox: dependency reopened " f"({dependency_task.title})."
                     ),
                     agent_id=actor_agent_id,
                 )
@@ -313,7 +302,8 @@ def _serialize_comment(event: ActivityEvent) -> dict[str, object]:
 
 
 async def _gateway_config(
-    session: AsyncSession, board: Board,
+    session: AsyncSession,
+    board: Board,
 ) -> GatewayClientConfig | None:
     if not board.gateway_id:
         return None
@@ -368,10 +358,7 @@ async def _notify_agent_on_task_assign(
     message = (
         "TASK ASSIGNED\n"
         + "\n".join(details)
-        + (
-            "\n\nTake action: open the task and begin work. "
-            "Post updates as task comments."
-        )
+        + ("\n\nTake action: open the task and begin work. " "Post updates as task comments.")
     )
     try:
         await _send_agent_task_message(
@@ -607,9 +594,7 @@ async def _stream_dependency_state(
     rows: list[tuple[ActivityEvent, Task | None]],
 ) -> tuple[dict[UUID, list[UUID]], dict[UUID, str]]:
     task_ids = [
-        task.id
-        for event, task in rows
-        if task is not None and event.event_type != "task.comment"
+        task.id for event, task in rows if task is not None and event.event_type != "task.comment"
     ]
     if not task_ids:
         return {}, {}
@@ -786,7 +771,8 @@ async def create_task(
         dependency_ids=normalized_deps,
     )
     blocked_by = blocked_by_dependency_ids(
-        dependency_ids=normalized_deps, status_by_id=dep_status,
+        dependency_ids=normalized_deps,
+        status_by_id=dep_status,
     )
     if blocked_by and (task.assigned_agent_id is not None or task.status != "inbox"):
         raise _blocked_task_error(blocked_by)
@@ -861,9 +847,7 @@ async def update_task(
     updates = payload.model_dump(exclude_unset=True)
     comment = payload.comment if "comment" in payload.model_fields_set else None
     depends_on_task_ids = (
-        payload.depends_on_task_ids
-        if "depends_on_task_ids" in payload.model_fields_set
-        else None
+        payload.depends_on_task_ids if "depends_on_task_ids" in payload.model_fields_set else None
     )
     updates.pop("comment", None)
     updates.pop("depends_on_task_ids", None)
@@ -906,13 +890,22 @@ async def delete_task(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     await require_board_access(session, user=auth.user, board=board, write=True)
     await crud.delete_where(
-        session, ActivityEvent, col(ActivityEvent.task_id) == task.id, commit=False,
+        session,
+        ActivityEvent,
+        col(ActivityEvent.task_id) == task.id,
+        commit=False,
     )
     await crud.delete_where(
-        session, TaskFingerprint, col(TaskFingerprint.task_id) == task.id, commit=False,
+        session,
+        TaskFingerprint,
+        col(TaskFingerprint.task_id) == task.id,
+        commit=False,
     )
     await crud.delete_where(
-        session, Approval, col(Approval.task_id) == task.id, commit=False,
+        session,
+        Approval,
+        col(Approval.task_id) == task.id,
+        commit=False,
     )
     await crud.delete_where(
         session,
@@ -929,7 +922,8 @@ async def delete_task(
 
 
 @router.get(
-    "/{task_id}/comments", response_model=DefaultLimitOffsetPage[TaskCommentRead],
+    "/{task_id}/comments",
+    response_model=DefaultLimitOffsetPage[TaskCommentRead],
 )
 async def list_task_comments(
     task: Task = TASK_DEP,
@@ -1241,11 +1235,7 @@ async def _lead_apply_assignment(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Board leads cannot assign tasks to themselves.",
         )
-    if (
-        agent.board_id
-        and update.task.board_id
-        and agent.board_id != update.task.board_id
-    ):
+    if agent.board_id and update.task.board_id and agent.board_id != update.task.board_id:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT)
     update.task.assigned_agent_id = agent.id
 
@@ -1256,19 +1246,13 @@ def _lead_apply_status(update: _TaskUpdateInput) -> None:
     if update.task.status != "review":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Board leads can only change status when a task is "
-                "in review."
-            ),
+            detail=("Board leads can only change status when a task is " "in review."),
         )
     target_status = _required_status_value(update.updates["status"])
     if target_status not in {"done", "inbox"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Board leads can only move review tasks to done "
-                "or inbox."
-            ),
+            detail=("Board leads can only move review tasks to done " "or inbox."),
         )
     if target_status == "inbox":
         update.task.assigned_agent_id = None
@@ -1397,9 +1381,7 @@ async def _apply_non_lead_agent_task_rules(
             update.task.assigned_agent_id = None
             update.task.in_progress_at = None
         else:
-            update.task.assigned_agent_id = (
-                update.actor.agent.id if update.actor.agent else None
-            )
+            update.task.assigned_agent_id = update.actor.agent.id if update.actor.agent else None
             if status_value == "in_progress":
                 update.task.in_progress_at = utcnow()
 
@@ -1462,11 +1444,7 @@ async def _apply_admin_task_rules(
         agent = await Agent.objects.by_id(assigned_agent_id).first(session)
         if agent is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-        if (
-            agent.board_id
-            and update.task.board_id
-            and agent.board_id != update.task.board_id
-        ):
+        if agent.board_id and update.task.board_id and agent.board_id != update.task.board_id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT)
 
 
@@ -1481,9 +1459,11 @@ async def _record_task_comment_from_update(
         event_type="task.comment",
         message=update.comment,
         task_id=update.task.id,
-        agent_id=update.actor.agent.id
-        if update.actor.actor_type == "agent" and update.actor.agent
-        else None,
+        agent_id=(
+            update.actor.agent.id
+            if update.actor.actor_type == "agent" and update.actor.agent
+            else None
+        ),
     )
     session.add(event)
     await session.commit()
@@ -1496,9 +1476,7 @@ async def _record_task_update_activity(
 ) -> None:
     event_type, message = _task_event_details(update.task, update.previous_status)
     actor_agent_id = (
-        update.actor.agent.id
-        if update.actor.actor_type == "agent" and update.actor.agent
-        else None
+        update.actor.agent.id if update.actor.actor_type == "agent" and update.actor.agent else None
     )
     record_activity(
         session,
@@ -1525,10 +1503,7 @@ async def _notify_task_update_assignment_changes(
     if (
         update.task.status == "inbox"
         and update.task.assigned_agent_id is None
-        and (
-            update.previous_status != "inbox"
-            or update.previous_assigned is not None
-        )
+        and (update.previous_status != "inbox" or update.previous_assigned is not None)
     ):
         board = (
             await Board.objects.by_id(update.task.board_id).first(session)

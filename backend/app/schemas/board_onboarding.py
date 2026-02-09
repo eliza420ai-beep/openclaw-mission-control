@@ -36,12 +36,8 @@ class BoardOnboardingConfirm(SQLModel):
     @model_validator(mode="after")
     def validate_goal_fields(self) -> Self:
         """Require goal metadata when the board type is `goal`."""
-        if self.board_type == "goal" and (
-            not self.objective or not self.success_metrics
-        ):
-            message = (
-                "Confirmed goal boards require objective and success_metrics"
-            )
+        if self.board_type == "goal" and (not self.objective or not self.success_metrics):
+            message = "Confirmed goal boards require objective and success_metrics"
             raise ValueError(message)
         return self
 

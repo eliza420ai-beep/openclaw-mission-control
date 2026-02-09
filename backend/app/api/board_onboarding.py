@@ -21,11 +21,7 @@ from app.core.config import settings
 from app.core.time import utcnow
 from app.db.session import get_session
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
-from app.integrations.openclaw_gateway import (
-    OpenClawGatewayError,
-    ensure_session,
-    send_message,
-)
+from app.integrations.openclaw_gateway import OpenClawGatewayError, ensure_session, send_message
 from app.models.board_onboarding import BoardOnboardingSession
 from app.models.gateways import Gateway
 from app.schemas.board_onboarding import (
@@ -39,11 +35,7 @@ from app.schemas.board_onboarding import (
     BoardOnboardingUserProfile,
 )
 from app.schemas.boards import BoardRead
-from app.services.board_leads import (
-    LeadAgentOptions,
-    LeadAgentRequest,
-    ensure_board_lead_agent,
-)
+from app.services.board_leads import LeadAgentOptions, LeadAgentRequest, ensure_board_lead_agent
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -62,7 +54,8 @@ ADMIN_AUTH_DEP = Depends(require_admin_auth)
 
 
 async def _gateway_config(
-    session: AsyncSession, board: Board,
+    session: AsyncSession,
+    board: Board,
 ) -> tuple[Gateway, GatewayClientConfig]:
     if not board.gateway_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -255,11 +248,15 @@ async def start_onboarding(
     try:
         await ensure_session(session_key, config=config, label="Main Agent")
         await send_message(
-            prompt, session_key=session_key, config=config, deliver=False,
+            prompt,
+            session_key=session_key,
+            config=config,
+            deliver=False,
         )
     except OpenClawGatewayError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
 
     onboarding = BoardOnboardingSession(
@@ -311,7 +308,8 @@ async def answer_onboarding(
         )
     except OpenClawGatewayError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
 
     onboarding.messages = messages

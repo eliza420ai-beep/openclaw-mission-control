@@ -53,19 +53,9 @@ from app.schemas.gateway_coordination import (
     GatewayMainAskUserResponse,
 )
 from app.schemas.pagination import DefaultLimitOffsetPage
-from app.schemas.tasks import (
-    TaskCommentCreate,
-    TaskCommentRead,
-    TaskCreate,
-    TaskRead,
-    TaskUpdate,
-)
+from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
-from app.services.board_leads import (
-    LeadAgentOptions,
-    LeadAgentRequest,
-    ensure_board_lead_agent,
-)
+from app.services.board_leads import LeadAgentOptions, LeadAgentRequest, ensure_board_lead_agent
 from app.services.task_dependencies import (
     blocked_by_dependency_ids,
     dependency_status_by_id,
@@ -212,7 +202,8 @@ async def _require_gateway_board(
     board = await Board.objects.by_id(board_id).first(session)
     if board is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Board not found",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Board not found",
         )
     if board.gateway_id != gateway.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
@@ -322,7 +313,8 @@ async def create_task(
         dependency_ids=normalized_deps,
     )
     blocked_by = blocked_by_dependency_ids(
-        dependency_ids=normalized_deps, status_by_id=dep_status,
+        dependency_ids=normalized_deps,
+        status_by_id=dep_status,
     )
 
     if blocked_by and (task.assigned_agent_id is not None or task.status != "inbox"):
@@ -393,11 +385,7 @@ async def update_task(
     agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
 ) -> TaskRead:
     """Update a task after board-level access checks."""
-    if (
-        agent_ctx.agent.board_id
-        and task.board_id
-        and agent_ctx.agent.board_id != task.board_id
-    ):
+    if agent_ctx.agent.board_id and task.board_id and agent_ctx.agent.board_id != task.board_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return await tasks_api.update_task(
         payload=payload,
@@ -417,11 +405,7 @@ async def list_task_comments(
     agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
 ) -> LimitOffsetPage[TaskCommentRead]:
     """List comments for a task visible to the authenticated agent."""
-    if (
-        agent_ctx.agent.board_id
-        and task.board_id
-        and agent_ctx.agent.board_id != task.board_id
-    ):
+    if agent_ctx.agent.board_id and task.board_id and agent_ctx.agent.board_id != task.board_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return await tasks_api.list_task_comments(
         task=task,
@@ -430,7 +414,8 @@ async def list_task_comments(
 
 
 @router.post(
-    "/boards/{board_id}/tasks/{task_id}/comments", response_model=TaskCommentRead,
+    "/boards/{board_id}/tasks/{task_id}/comments",
+    response_model=TaskCommentRead,
 )
 async def create_task_comment(
     payload: TaskCommentCreate,
@@ -439,11 +424,7 @@ async def create_task_comment(
     agent_ctx: AgentAuthContext = AGENT_CTX_DEP,
 ) -> ActivityEvent:
     """Create a task comment on behalf of the authenticated agent."""
-    if (
-        agent_ctx.agent.board_id
-        and task.board_id
-        and agent_ctx.agent.board_id != task.board_id
-    ):
+    if agent_ctx.agent.board_id and task.board_id and agent_ctx.agent.board_id != task.board_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     return await tasks_api.create_task_comment(
         payload=payload,
@@ -454,7 +435,8 @@ async def create_task_comment(
 
 
 @router.get(
-    "/boards/{board_id}/memory", response_model=DefaultLimitOffsetPage[BoardMemoryRead],
+    "/boards/{board_id}/memory",
+    response_model=DefaultLimitOffsetPage[BoardMemoryRead],
 )
 async def list_board_memory(
     is_chat: bool | None = IS_CHAT_QUERY,
@@ -588,7 +570,9 @@ async def nudge_agent(
     config = await _gateway_config(session, board)
     try:
         await ensure_session(
-            target.openclaw_session_id, config=config, label=target.name,
+            target.openclaw_session_id,
+            config=config,
+            label=target.name,
         )
         await send_message(
             message,
@@ -605,7 +589,8 @@ async def nudge_agent(
         )
         await session.commit()
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
     record_activity(
         session,
@@ -657,7 +642,8 @@ async def get_agent_soul(
         )
     except OpenClawGatewayError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
     if isinstance(payload, str):
         return payload
@@ -671,7 +657,8 @@ async def get_agent_soul(
             if isinstance(nested, str):
                 return nested
     raise HTTPException(
-        status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid gateway response",
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail="Invalid gateway response",
     )
 
 
@@ -712,7 +699,8 @@ async def update_agent_soul(
         )
     except OpenClawGatewayError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
     reason = (payload.reason or "").strip()
     source_url = (payload.source_url or "").strip()
@@ -770,9 +758,7 @@ async def ask_user_via_gateway_main(
     correlation = payload.correlation_id.strip() if payload.correlation_id else ""
     correlation_line = f"Correlation ID: {correlation}\n" if correlation else ""
     preferred_channel = (payload.preferred_channel or "").strip()
-    channel_line = (
-        f"Preferred channel: {preferred_channel}\n" if preferred_channel else ""
-    )
+    channel_line = f"Preferred channel: {preferred_channel}\n" if preferred_channel else ""
 
     tags = payload.reply_tags or ["gateway_main", "user_reply"]
     tags_json = json.dumps(tags)
@@ -801,7 +787,10 @@ async def ask_user_via_gateway_main(
     try:
         await ensure_session(main_session_key, config=config, label="Main Agent")
         await send_message(
-            message, session_key=main_session_key, config=config, deliver=True,
+            message,
+            session_key=main_session_key,
+            config=config,
+            deliver=True,
         )
     except OpenClawGatewayError as exc:
         record_activity(
@@ -812,7 +801,8 @@ async def ask_user_via_gateway_main(
         )
         await session.commit()
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
 
     record_activity(
@@ -867,11 +857,7 @@ async def message_gateway_board_lead(
         )
 
     base_url = settings.base_url or "http://localhost:8000"
-    header = (
-        "GATEWAY MAIN QUESTION"
-        if payload.kind == "question"
-        else "GATEWAY MAIN HANDOFF"
-    )
+    header = "GATEWAY MAIN QUESTION" if payload.kind == "question" else "GATEWAY MAIN HANDOFF"
     correlation = payload.correlation_id.strip() if payload.correlation_id else ""
     correlation_line = f"Correlation ID: {correlation}\n" if correlation else ""
     tags = payload.reply_tags or ["gateway_main", "lead_reply"]
@@ -903,7 +889,8 @@ async def message_gateway_board_lead(
         )
         await session.commit()
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
         ) from exc
 
     record_activity(
@@ -946,11 +933,7 @@ async def broadcast_gateway_lead_message(
     boards = list(await session.exec(statement))
 
     base_url = settings.base_url or "http://localhost:8000"
-    header = (
-        "GATEWAY MAIN QUESTION"
-        if payload.kind == "question"
-        else "GATEWAY MAIN HANDOFF"
-    )
+    header = "GATEWAY MAIN QUESTION" if payload.kind == "question" else "GATEWAY MAIN HANDOFF"
     correlation = payload.correlation_id.strip() if payload.correlation_id else ""
     correlation_line = f"Correlation ID: {correlation}\n" if correlation else ""
     tags = payload.reply_tags or ["gateway_main", "lead_reply"]

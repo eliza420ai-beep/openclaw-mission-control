@@ -22,10 +22,7 @@ from app.models.activity_events import ActivityEvent
 from app.models.agents import Agent
 from app.models.boards import Board
 from app.models.tasks import Task
-from app.schemas.activity_events import (
-    ActivityEventRead,
-    ActivityTaskCommentFeedItemRead,
-)
+from app.schemas.activity_events import ActivityEventRead, ActivityTaskCommentFeedItemRead
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.organizations import (
     OrganizationContext,
@@ -198,10 +195,7 @@ async def list_task_comment_feed(
 
     def _transform(items: Sequence[Any]) -> Sequence[Any]:
         rows = _coerce_task_comment_rows(items)
-        return [
-            _feed_item(event, task, board, agent)
-            for event, task, board, agent in rows
-        ]
+        return [_feed_item(event, task, board, agent) for event, task, board, agent in rows]
 
     return await paginate(session, statement, transformer=_transform)
 

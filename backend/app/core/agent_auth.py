@@ -77,10 +77,7 @@ async def _touch_agent_presence(
     real activity even if the heartbeat loop isn't running.
     """
     now = utcnow()
-    if (
-        agent.last_seen_at is not None
-        and now - agent.last_seen_at < _LAST_SEEN_TOUCH_INTERVAL
-    ):
+    if agent.last_seen_at is not None and now - agent.last_seen_at < _LAST_SEEN_TOUCH_INTERVAL:
         return
 
     agent.last_seen_at = now
