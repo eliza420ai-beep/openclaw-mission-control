@@ -342,155 +342,155 @@ export const TaskBoard = memo(function TaskBoard({
         "sm:grid-flow-col sm:auto-cols-[minmax(260px,320px)] sm:grid-cols-none sm:overflow-x-auto",
       )}
     >
-        {columns.map((column) => {
-          const columnTasks = grouped[column.status] ?? [];
-          const reviewCounts =
-            column.status === "review"
-              ? columnTasks.reduce(
-                  (acc, task) => {
-                    if (task.is_blocked) {
-                      acc.blocked += 1;
-                      return acc;
-                    }
-                    if ((task.approvals_pending_count ?? 0) > 0) {
-                      acc.approval_needed += 1;
-                      return acc;
-                    }
-                    acc.waiting_lead += 1;
+      {columns.map((column) => {
+        const columnTasks = grouped[column.status] ?? [];
+        const reviewCounts =
+          column.status === "review"
+            ? columnTasks.reduce(
+                (acc, task) => {
+                  if (task.is_blocked) {
+                    acc.blocked += 1;
                     return acc;
-                  },
-                  {
-                    all: columnTasks.length,
-                    approval_needed: 0,
-                    waiting_lead: 0,
-                    blocked: 0,
-                  },
-                )
-              : null;
+                  }
+                  if ((task.approvals_pending_count ?? 0) > 0) {
+                    acc.approval_needed += 1;
+                    return acc;
+                  }
+                  acc.waiting_lead += 1;
+                  return acc;
+                },
+                {
+                  all: columnTasks.length,
+                  approval_needed: 0,
+                  waiting_lead: 0,
+                  blocked: 0,
+                },
+              )
+            : null;
 
-          const filteredTasks =
-            column.status === "review" && reviewBucket !== "all"
-              ? columnTasks.filter((task) => {
-                  if (reviewBucket === "blocked")
-                    return Boolean(task.is_blocked);
-                  if (reviewBucket === "approval_needed")
-                    return (
-                      (task.approvals_pending_count ?? 0) > 0 &&
-                      !task.is_blocked
-                    );
-                  if (reviewBucket === "waiting_lead")
-                    return (
-                      !task.is_blocked &&
-                      (task.approvals_pending_count ?? 0) === 0
-                    );
-                  return true;
-                })
-              : columnTasks;
+        const filteredTasks =
+          column.status === "review" && reviewBucket !== "all"
+            ? columnTasks.filter((task) => {
+                if (reviewBucket === "blocked") return Boolean(task.is_blocked);
+                if (reviewBucket === "approval_needed")
+                  return (
+                    (task.approvals_pending_count ?? 0) > 0 && !task.is_blocked
+                  );
+                if (reviewBucket === "waiting_lead")
+                  return (
+                    !task.is_blocked &&
+                    (task.approvals_pending_count ?? 0) === 0
+                  );
+                return true;
+              })
+            : columnTasks;
 
-          return (
-            <div
-              key={column.title}
-              className={cn(
-                // On mobile, columns are stacked, so avoid forcing tall fixed heights.
-                "kanban-column min-h-0",
-                // On larger screens, keep columns tall to reduce empty space during drag.
-                "sm:min-h-[calc(100vh-260px)]",
-                activeColumn === column.status &&
-                  !readOnly &&
-                  "ring-2 ring-slate-200",
-              )}
-              onDrop={readOnly ? undefined : handleDrop(column.status)}
-              onDragOver={readOnly ? undefined : handleDragOver(column.status)}
-              onDragLeave={readOnly ? undefined : handleDragLeave(column.status)}
-            >
-              <div className="column-header z-10 rounded-t-xl border border-b-0 border-slate-200 bg-white px-4 py-3 sm:sticky sm:top-0 sm:bg-white/80 sm:backdrop-blur">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={cn("h-2 w-2 rounded-full", column.dot)} />
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      {column.title}
-                    </h3>
-                  </div>
-                  <span
-                    className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
-                      column.badge,
-                    )}
-                  >
-                    {filteredTasks.length}
-                  </span>
+        return (
+          <div
+            key={column.title}
+            className={cn(
+              // On mobile, columns are stacked, so avoid forcing tall fixed heights.
+              "kanban-column min-h-0",
+              // On larger screens, keep columns tall to reduce empty space during drag.
+              "sm:min-h-[calc(100vh-260px)]",
+              activeColumn === column.status &&
+                !readOnly &&
+                "ring-2 ring-slate-200",
+            )}
+            onDrop={readOnly ? undefined : handleDrop(column.status)}
+            onDragOver={readOnly ? undefined : handleDragOver(column.status)}
+            onDragLeave={readOnly ? undefined : handleDragLeave(column.status)}
+          >
+            <div className="column-header z-10 rounded-t-xl border border-b-0 border-slate-200 bg-white px-4 py-3 sm:sticky sm:top-0 sm:bg-white/80 sm:backdrop-blur">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={cn("h-2 w-2 rounded-full", column.dot)} />
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {column.title}
+                  </h3>
                 </div>
-                {column.status === "review" && reviewCounts ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                    {(
-                      [
-                        { key: "all", label: "All", count: reviewCounts.all },
-                        {
-                          key: "approval_needed",
-                          label: "Approval needed",
-                          count: reviewCounts.approval_needed,
-                        },
-                        {
-                          key: "waiting_lead",
-                          label: "Lead review",
-                          count: reviewCounts.waiting_lead,
-                        },
-                        {
-                          key: "blocked",
-                          label: "Blocked",
-                          count: reviewCounts.blocked,
-                        },
-                      ] as const
-                    ).map((option) => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setReviewBucket(option.key)}
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 transition",
-                          reviewBucket === option.key
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
-                        )}
-                        aria-pressed={reviewBucket === option.key}
-                      >
-                        {option.label} · {option.count}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                <span
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
+                    column.badge,
+                  )}
+                >
+                  {filteredTasks.length}
+                </span>
               </div>
-              <div className="rounded-b-xl border border-t-0 border-slate-200 bg-white p-3">
-                <div className="space-y-3">
-                  {filteredTasks.map((task) => {
-                    const dueState = resolveDueState(task);
-                    return (
-                      <div key={task.id} ref={setCardRef(task.id)}>
-                        <TaskCard
-                          title={task.title}
-                          status={task.status}
-                          priority={task.priority}
-                          assignee={task.assignee ?? undefined}
-                          due={dueState.due}
-                          isOverdue={dueState.isOverdue}
-                          approvalsPendingCount={task.approvals_pending_count}
-                          tags={task.tags}
-                          isBlocked={task.is_blocked}
-                          blockedByCount={task.blocked_by_task_ids?.length ?? 0}
-                          onClick={() => onTaskSelect?.(task)}
-                          draggable={!readOnly && !task.is_blocked}
-                          isDragging={draggingId === task.id}
-                          onDragStart={readOnly ? undefined : handleDragStart(task)}
-                          onDragEnd={readOnly ? undefined : handleDragEnd}
-                        />
-                      </div>
-                    );
-                  })}
+              {column.status === "review" && reviewCounts ? (
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  {(
+                    [
+                      { key: "all", label: "All", count: reviewCounts.all },
+                      {
+                        key: "approval_needed",
+                        label: "Approval needed",
+                        count: reviewCounts.approval_needed,
+                      },
+                      {
+                        key: "waiting_lead",
+                        label: "Lead review",
+                        count: reviewCounts.waiting_lead,
+                      },
+                      {
+                        key: "blocked",
+                        label: "Blocked",
+                        count: reviewCounts.blocked,
+                      },
+                    ] as const
+                  ).map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setReviewBucket(option.key)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 transition",
+                        reviewBucket === option.key
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
+                      )}
+                      aria-pressed={reviewBucket === option.key}
+                    >
+                      {option.label} · {option.count}
+                    </button>
+                  ))}
                 </div>
+              ) : null}
+            </div>
+            <div className="rounded-b-xl border border-t-0 border-slate-200 bg-white p-3">
+              <div className="space-y-3">
+                {filteredTasks.map((task) => {
+                  const dueState = resolveDueState(task);
+                  return (
+                    <div key={task.id} ref={setCardRef(task.id)}>
+                      <TaskCard
+                        title={task.title}
+                        status={task.status}
+                        priority={task.priority}
+                        assignee={task.assignee ?? undefined}
+                        due={dueState.due}
+                        isOverdue={dueState.isOverdue}
+                        approvalsPendingCount={task.approvals_pending_count}
+                        tags={task.tags}
+                        isBlocked={task.is_blocked}
+                        blockedByCount={task.blocked_by_task_ids?.length ?? 0}
+                        onClick={() => onTaskSelect?.(task)}
+                        draggable={!readOnly && !task.is_blocked}
+                        isDragging={draggingId === task.id}
+                        onDragStart={
+                          readOnly ? undefined : handleDragStart(task)
+                        }
+                        onDragEnd={readOnly ? undefined : handleDragEnd}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          );
-        })}
+          </div>
+        );
+      })}
     </div>
   );
 });

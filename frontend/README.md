@@ -113,6 +113,7 @@ It will:
 When changing UI intended to be mobile-ready, validate in Chrome (or similar) using the device toolbar at common widths (e.g. **320px**, **375px**, **768px**).
 
 Quick checklist:
+
 - No horizontal scroll
 - Primary actions reachable without precision taps
 - Focus rings visible when tabbing

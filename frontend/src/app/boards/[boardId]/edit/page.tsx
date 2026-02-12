@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/auth/clerk";
 import { X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ApiError } from "@/api/mutator";
 import {
@@ -14,6 +15,14 @@ import {
   useGetBoardApiV1BoardsBoardIdGet,
   useUpdateBoardApiV1BoardsBoardIdPatch,
 } from "@/api/generated/boards/boards";
+import {
+  getListBoardWebhooksApiV1BoardsBoardIdWebhooksGetQueryKey,
+  type listBoardWebhooksApiV1BoardsBoardIdWebhooksGetResponse,
+  useCreateBoardWebhookApiV1BoardsBoardIdWebhooksPost,
+  useDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete,
+  useListBoardWebhooksApiV1BoardsBoardIdWebhooksGet,
+  useUpdateBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdPatch,
+} from "@/api/generated/board-webhooks/board-webhooks";
 import {
   type listBoardGroupsApiV1BoardGroupsGetResponse,
   useListBoardGroupsApiV1BoardGroupsGet,
@@ -25,6 +34,7 @@ import {
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import type {
   BoardGroupRead,
+  BoardWebhookRead,
   BoardRead,
   BoardUpdate,
 } from "@/api/generated/model";
@@ -51,8 +61,147 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "") || "board";
 
+type WebhookCardProps = {
+  webhook: BoardWebhookRead;
+  isLoading: boolean;
+  isWebhookCreating: boolean;
+  isDeletingWebhook: boolean;
+  isUpdatingWebhook: boolean;
+  copiedWebhookId: string | null;
+  onCopy: (webhook: BoardWebhookRead) => void;
+  onDelete: (webhookId: string) => void;
+  onViewPayloads: (webhookId: string) => void;
+  onUpdate: (webhookId: string, description: string) => Promise<boolean>;
+};
+
+function WebhookCard({
+  webhook,
+  isLoading,
+  isWebhookCreating,
+  isDeletingWebhook,
+  isUpdatingWebhook,
+  copiedWebhookId,
+  onCopy,
+  onDelete,
+  onViewPayloads,
+  onUpdate,
+}: WebhookCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftDescription, setDraftDescription] = useState(webhook.description);
+
+  const isBusy =
+    isLoading || isWebhookCreating || isDeletingWebhook || isUpdatingWebhook;
+  const trimmedDescription = draftDescription.trim();
+  const isDescriptionChanged =
+    trimmedDescription !== webhook.description.trim();
+
+  const handleSave = async () => {
+    if (!trimmedDescription) return;
+    if (!isDescriptionChanged) {
+      setIsEditing(false);
+      return;
+    }
+    const saved = await onUpdate(webhook.id, trimmedDescription);
+    if (saved) {
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <div
+      key={webhook.id}
+      className="space-y-3 rounded-lg border border-slate-200 px-4 py-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-slate-900">
+          Webhook {webhook.id.slice(0, 8)}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onCopy(webhook)}
+            disabled={isBusy}
+          >
+            {copiedWebhookId === webhook.id ? "Copied" : "Copy endpoint"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onViewPayloads(webhook.id)}
+            disabled={isBusy}
+          >
+            View payloads
+          </Button>
+          {isEditing ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDraftDescription(webhook.description);
+                  setIsEditing(false);
+                }}
+                disabled={isBusy}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={isBusy || !trimmedDescription}
+              >
+                {isUpdatingWebhook ? "Saving…" : "Save"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDraftDescription(webhook.description);
+                  setIsEditing(true);
+                }}
+                disabled={isBusy}
+              >
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onDelete(webhook.id)}
+                disabled={isBusy}
+              >
+                {isDeletingWebhook ? "Deleting…" : "Delete"}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      {isEditing ? (
+        <Textarea
+          value={draftDescription}
+          onChange={(event) => setDraftDescription(event.target.value)}
+          placeholder="Describe exactly what the lead agent should do when payloads arrive."
+          className="min-h-[90px]"
+          disabled={isBusy}
+        />
+      ) : (
+        <p className="text-sm text-slate-700">{webhook.description}</p>
+      )}
+      <div className="rounded-md bg-slate-50 px-3 py-2">
+        <code className="break-all text-xs text-slate-700">
+          {webhook.endpoint_url ?? webhook.endpoint_path}
+        </code>
+      </div>
+    </div>
+  );
+}
+
 export default function EditBoardPage() {
   const { isSignedIn } = useAuth();
+  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
@@ -89,6 +238,9 @@ export default function EditBoardPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [webhookDescription, setWebhookDescription] = useState("");
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
 
   const onboardingParam = searchParams.get("onboarding");
   const searchParamsString = searchParams.toString();
@@ -170,6 +322,20 @@ export default function EditBoardPage() {
       retry: false,
     },
   });
+  const webhooksQuery = useListBoardWebhooksApiV1BoardsBoardIdWebhooksGet<
+    listBoardWebhooksApiV1BoardsBoardIdWebhooksGetResponse,
+    ApiError
+  >(
+    boardId ?? "",
+    { limit: 50 },
+    {
+      query: {
+        enabled: Boolean(isSignedIn && isAdmin && boardId),
+        refetchOnMount: "always",
+        retry: false,
+      },
+    },
+  );
 
   const updateBoardMutation = useUpdateBoardApiV1BoardsBoardIdPatch<ApiError>({
     mutation: {
@@ -183,6 +349,58 @@ export default function EditBoardPage() {
       },
     },
   });
+  const createWebhookMutation =
+    useCreateBoardWebhookApiV1BoardsBoardIdWebhooksPost<ApiError>({
+      mutation: {
+        onSuccess: async () => {
+          if (!boardId) return;
+          setWebhookDescription("");
+          await queryClient.invalidateQueries({
+            queryKey:
+              getListBoardWebhooksApiV1BoardsBoardIdWebhooksGetQueryKey(
+                boardId,
+              ),
+          });
+        },
+        onError: (err) => {
+          setWebhookError(err.message || "Unable to create webhook.");
+        },
+      },
+    });
+  const deleteWebhookMutation =
+    useDeleteBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdDelete<ApiError>({
+      mutation: {
+        onSuccess: async () => {
+          if (!boardId) return;
+          await queryClient.invalidateQueries({
+            queryKey:
+              getListBoardWebhooksApiV1BoardsBoardIdWebhooksGetQueryKey(
+                boardId,
+              ),
+          });
+        },
+        onError: (err) => {
+          setWebhookError(err.message || "Unable to delete webhook.");
+        },
+      },
+    });
+  const updateWebhookMutation =
+    useUpdateBoardWebhookApiV1BoardsBoardIdWebhooksWebhookIdPatch<ApiError>({
+      mutation: {
+        onSuccess: async () => {
+          if (!boardId) return;
+          await queryClient.invalidateQueries({
+            queryKey:
+              getListBoardWebhooksApiV1BoardsBoardIdWebhooksGetQueryKey(
+                boardId,
+              ),
+          });
+        },
+        onError: (err) => {
+          setWebhookError(err.message || "Unable to update webhook.");
+        },
+      },
+    });
 
   const gateways = useMemo(() => {
     if (gatewaysQuery.data?.status !== 200) return [];
@@ -216,6 +434,19 @@ export default function EditBoardPage() {
     targetDate ?? toLocalDateInput(baseBoard?.target_date);
 
   const displayGatewayId = resolvedGatewayId || gateways[0]?.id || "";
+  const isWebhookCreating = createWebhookMutation.isPending;
+  const deletingWebhookId =
+    deleteWebhookMutation.isPending && deleteWebhookMutation.variables
+      ? deleteWebhookMutation.variables.webhookId
+      : null;
+  const updatingWebhookId =
+    updateWebhookMutation.isPending && updateWebhookMutation.variables
+      ? updateWebhookMutation.variables.webhookId
+      : null;
+  const isWebhookBusy =
+    isWebhookCreating ||
+    deleteWebhookMutation.isPending ||
+    updateWebhookMutation.isPending;
 
   const isLoading =
     gatewaysQuery.isLoading ||
@@ -228,6 +459,8 @@ export default function EditBoardPage() {
     groupsQuery.error?.message ??
     boardQuery.error?.message ??
     null;
+  const webhookErrorMessage =
+    webhookError ?? webhooksQuery.error?.message ?? null;
 
   const isFormReady = Boolean(
     resolvedName.trim() && resolvedDescription.trim() && displayGatewayId,
@@ -250,6 +483,10 @@ export default function EditBoardPage() {
     ],
     [groups],
   );
+  const webhooks = useMemo<BoardWebhookRead[]>(() => {
+    if (webhooksQuery.data?.status !== 200) return [];
+    return webhooksQuery.data.data.items ?? [];
+  }, [webhooksQuery.data]);
 
   const handleOnboardingConfirmed = (updated: BoardRead) => {
     setBoard(updated);
@@ -294,10 +531,7 @@ export default function EditBoardPage() {
     setMetricsError(null);
 
     let parsedMetrics: Record<string, unknown> | null = null;
-    if (
-      resolvedBoardType !== "general" &&
-      resolvedSuccessMetrics.trim()
-    ) {
+    if (resolvedBoardType !== "general" && resolvedSuccessMetrics.trim()) {
       try {
         parsedMetrics = JSON.parse(resolvedSuccessMetrics) as Record<
           string,
@@ -333,6 +567,74 @@ export default function EditBoardPage() {
     };
 
     updateBoardMutation.mutate({ boardId, data: payload });
+  };
+
+  const handleCreateWebhook = () => {
+    if (!boardId) return;
+    const trimmedDescription = webhookDescription.trim();
+    if (!trimmedDescription) {
+      setWebhookError("Webhook instruction is required.");
+      return;
+    }
+    setWebhookError(null);
+    createWebhookMutation.mutate({
+      boardId,
+      data: {
+        description: trimmedDescription,
+        enabled: true,
+      },
+    });
+  };
+
+  const handleDeleteWebhook = (webhookId: string) => {
+    if (!boardId) return;
+    if (deleteWebhookMutation.isPending) return;
+    setWebhookError(null);
+    deleteWebhookMutation.mutate({ boardId, webhookId });
+  };
+
+  const handleUpdateWebhook = async (
+    webhookId: string,
+    description: string,
+  ): Promise<boolean> => {
+    if (!boardId) return false;
+    if (updateWebhookMutation.isPending) return false;
+    const trimmedDescription = description.trim();
+    if (!trimmedDescription) {
+      setWebhookError("Webhook instruction is required.");
+      return false;
+    }
+    setWebhookError(null);
+    try {
+      await updateWebhookMutation.mutateAsync({
+        boardId,
+        webhookId,
+        data: { description: trimmedDescription },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleCopyWebhookEndpoint = async (webhook: BoardWebhookRead) => {
+    const endpoint = (webhook.endpoint_url ?? webhook.endpoint_path).trim();
+    try {
+      await navigator.clipboard.writeText(endpoint);
+      setCopiedWebhookId(webhook.id);
+      window.setTimeout(() => {
+        setCopiedWebhookId((current) =>
+          current === webhook.id ? null : current,
+        );
+      }, 1500);
+    } catch {
+      setWebhookError("Unable to copy webhook endpoint.");
+    }
+  };
+
+  const handleViewWebhookPayloads = (webhookId: string) => {
+    if (!boardId) return;
+    router.push(`/boards/${boardId}/webhooks/${webhookId}/payloads`);
   };
 
   return (
@@ -510,7 +812,9 @@ export default function EditBoardPage() {
 
             <section className="space-y-3 border-t border-slate-200 pt-4">
               <div>
-                <h2 className="text-base font-semibold text-slate-900">Rules</h2>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Rules
+                </h2>
                 <p className="text-xs text-slate-600">
                   Configure board-level workflow enforcement.
                 </p>
@@ -650,6 +954,84 @@ export default function EditBoardPage() {
                 {isLoading ? "Saving…" : "Save changes"}
               </Button>
             </div>
+
+            <section className="space-y-4 border-t border-slate-200 pt-4">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">
+                  Webhooks
+                </h2>
+                <p className="text-xs text-slate-600">
+                  Add inbound webhook endpoints so the lead agent can react to
+                  external events.
+                </p>
+              </div>
+              <div className="space-y-3 rounded-lg border border-slate-200 px-4 py-4">
+                <label className="text-sm font-medium text-slate-900">
+                  Lead agent instruction
+                </label>
+                <Textarea
+                  value={webhookDescription}
+                  onChange={(event) =>
+                    setWebhookDescription(event.target.value)
+                  }
+                  placeholder="Describe exactly what the lead agent should do when payloads arrive."
+                  className="min-h-[90px]"
+                  disabled={isLoading || isWebhookBusy}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleCreateWebhook}
+                    disabled={
+                      isLoading ||
+                      isWebhookBusy ||
+                      !baseBoard ||
+                      !webhookDescription.trim()
+                    }
+                  >
+                    {createWebhookMutation.isPending
+                      ? "Creating webhook…"
+                      : "Create webhook"}
+                  </Button>
+                </div>
+              </div>
+
+              {webhookErrorMessage ? (
+                <p className="text-sm text-red-500">{webhookErrorMessage}</p>
+              ) : null}
+
+              {webhooksQuery.isLoading ? (
+                <p className="text-sm text-slate-500">Loading webhooks…</p>
+              ) : null}
+
+              {!webhooksQuery.isLoading && webhooks.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-600">
+                  No webhooks configured yet.
+                </p>
+              ) : null}
+
+              <div className="space-y-3">
+                {webhooks.map((webhook) => {
+                  const isDeletingWebhook = deletingWebhookId === webhook.id;
+                  const isUpdatingWebhook = updatingWebhookId === webhook.id;
+                  return (
+                    <WebhookCard
+                      key={webhook.id}
+                      webhook={webhook}
+                      isLoading={isLoading}
+                      isWebhookCreating={isWebhookCreating}
+                      isDeletingWebhook={isDeletingWebhook}
+                      isUpdatingWebhook={isUpdatingWebhook}
+                      copiedWebhookId={copiedWebhookId}
+                      onCopy={handleCopyWebhookEndpoint}
+                      onDelete={handleDeleteWebhook}
+                      onViewPayloads={handleViewWebhookPayloads}
+                      onUpdate={handleUpdateWebhook}
+                    />
+                  );
+                })}
+              </div>
+            </section>
           </form>
         </div>
       </DashboardPageLayout>

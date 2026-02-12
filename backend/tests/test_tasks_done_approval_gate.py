@@ -277,7 +277,9 @@ async def test_update_task_allows_done_from_review_when_review_toggle_enabled() 
 
 
 @pytest.mark.asyncio
-async def test_update_task_rejects_status_change_with_pending_approval_when_toggle_enabled() -> None:
+async def test_update_task_rejects_status_change_with_pending_approval_when_toggle_enabled() -> (
+    None
+):
     engine = await _make_engine()
     try:
         async with await _make_session(engine) as session:
@@ -318,7 +320,9 @@ async def test_update_task_rejects_status_change_with_pending_approval_when_togg
 
 
 @pytest.mark.asyncio
-async def test_update_task_allows_status_change_with_pending_approval_when_toggle_disabled() -> None:
+async def test_update_task_allows_status_change_with_pending_approval_when_toggle_disabled() -> (
+    None
+):
     engine = await _make_engine()
     try:
         async with await _make_session(engine) as session:
@@ -353,7 +357,9 @@ async def test_update_task_allows_status_change_with_pending_approval_when_toggl
 
 
 @pytest.mark.asyncio
-async def test_update_task_rejects_status_change_for_pending_multi_task_link_when_toggle_enabled() -> None:
+async def test_update_task_rejects_status_change_for_pending_multi_task_link_when_toggle_enabled() -> (
+    None
+):
     engine = await _make_engine()
     try:
         async with await _make_session(engine) as session:
