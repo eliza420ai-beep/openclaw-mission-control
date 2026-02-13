@@ -1061,9 +1061,7 @@ async def update_task(
         board_id=board_id,
         previous_status=previous_status,
         previous_assigned=previous_assigned,
-        status_requested=(
-            requested_status is not None and requested_status != previous_status
-        ),
+        status_requested=(requested_status is not None and requested_status != previous_status),
         updates=updates,
         comment=comment,
         depends_on_task_ids=depends_on_task_ids,
@@ -1678,6 +1676,18 @@ async def _apply_non_lead_agent_task_rules(
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     if "status" in update.updates:
+        only_lead_can_change_status = (
+            await session.exec(
+                select(col(Board.only_lead_can_change_status)).where(
+                    col(Board.id) == update.board_id,
+                ),
+            )
+        ).first()
+        if only_lead_can_change_status:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only board leads can change task status.",
+            )
         status_value = _required_status_value(update.updates["status"])
         if status_value != "inbox":
             dep_ids = await _task_dep_ids(
