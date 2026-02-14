@@ -486,6 +486,61 @@ async def test_create_skill_pack_rejects_localhost_source_url() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_skill_pack_is_unique_by_normalized_source_url() -> None:
+    engine = await _make_engine()
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    try:
+        async with session_maker() as session:
+            organization, _gateway = await _seed_base(session)
+            await session.commit()
+
+        app = _build_test_app(session_maker, organization=organization)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            first = await client.post(
+                "/api/v1/skills/packs",
+                json={"source_url": "https://github.com/org/repo"},
+            )
+            spaced = await client.post(
+                "/api/v1/skills/packs",
+                json={"source_url": " https://github.com/org/repo.git  "},
+            )
+            second = await client.post(
+                "/api/v1/skills/packs",
+                json={"source_url": "https://github.com/org/repo/"},
+            )
+            third = await client.post(
+                "/api/v1/skills/packs",
+                json={"source_url": "https://github.com/org/repo.git"},
+            )
+            packs = await client.get("/api/v1/skills/packs")
+
+        assert first.status_code == 200
+        assert spaced.status_code == 200
+        assert second.status_code == 200
+        assert third.status_code == 200
+        assert spaced.json()["id"] == first.json()["id"]
+        assert spaced.json()["source_url"] == first.json()["source_url"]
+        assert second.json()["id"] == first.json()["id"]
+        assert second.json()["source_url"] == first.json()["source_url"]
+        assert third.json()["id"] == first.json()["id"]
+        assert third.json()["source_url"] == first.json()["source_url"]
+        assert packs.status_code == 200
+        pack_items = packs.json()
+        assert len(pack_items) == 1
+        assert pack_items[0]["source_url"] == "https://github.com/org/repo"
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_list_skill_packs_includes_skill_count() -> None:
     engine = await _make_engine()
     session_maker = async_sessionmaker(
@@ -544,6 +599,109 @@ async def test_list_skill_packs_includes_skill_count() -> None:
         assert len(items) == 1
         assert items[0]["name"] == "Pack One"
         assert items[0]["skill_count"] == 2
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_update_skill_pack_rejects_duplicate_normalized_source_url() -> None:
+    engine = await _make_engine()
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    try:
+        async with session_maker() as session:
+            organization, _gateway = await _seed_base(session)
+            pack_a = SkillPack(
+                organization_id=organization.id,
+                source_url="https://github.com/org/repo",
+                name="Pack A",
+            )
+            pack_b = SkillPack(
+                organization_id=organization.id,
+                source_url="https://github.com/org/other-repo",
+                name="Pack B",
+            )
+            session.add(pack_a)
+            session.add(pack_b)
+            await session.commit()
+            await session.refresh(pack_a)
+            await session.refresh(pack_b)
+
+        app = _build_test_app(session_maker, organization=organization)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.patch(
+                f"/api/v1/skills/packs/{pack_b.id}",
+                json={"source_url": "https://github.com/org/repo/"},
+            )
+
+        assert response.status_code == 409
+        assert "already exists" in response.json()["detail"].lower()
+
+        async with session_maker() as session:
+            pack_rows = (
+                await session.exec(
+                    select(SkillPack)
+                    .where(col(SkillPack.organization_id) == organization.id)
+                    .order_by(col(SkillPack.created_at).asc())
+                )
+            ).all()
+        assert len(pack_rows) == 2
+        assert {str(pack.source_url) for pack in pack_rows} == {
+            "https://github.com/org/repo",
+            "https://github.com/org/other-repo",
+        }
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_update_skill_pack_normalizes_source_url_on_update() -> None:
+    engine = await _make_engine()
+    session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    try:
+        async with session_maker() as session:
+            organization, _gateway = await _seed_base(session)
+            pack = SkillPack(
+                organization_id=organization.id,
+                source_url="https://github.com/org/old",
+                name="Initial",
+            )
+            session.add(pack)
+            await session.commit()
+            await session.refresh(pack)
+
+        app = _build_test_app(session_maker, organization=organization)
+
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.patch(
+                f"/api/v1/skills/packs/{pack.id}",
+                json={"source_url": " https://github.com/org/new.git/ "},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["source_url"] == "https://github.com/org/new"
+
+        async with session_maker() as session:
+            updated = (
+                await session.exec(
+                    select(SkillPack).where(col(SkillPack.id) == pack.id),
+                )
+            ).one()
+            assert str(updated.source_url) == "https://github.com/org/new"
     finally:
         await engine.dispose()
 
@@ -672,3 +830,39 @@ def test_collect_pack_skills_from_repo_supports_top_level_skill_folders(
         "https://github.com/BrianRWagner/ai-marketing-skills/tree/main/homepage-audit"
         in by_source
     )
+
+
+def test_collect_pack_skills_from_repo_streams_large_index(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "SKILL.md").write_text("# Fallback Skill\n", encoding="utf-8")
+
+    huge_description = "x" * (300 * 1024)
+    (repo_dir / "skills_index.json").write_text(
+        json.dumps(
+            {
+                "skills": [
+                    {
+                        "id": "oversized",
+                        "name": "Huge Index Skill",
+                        "description": huge_description,
+                        "path": "skills/ignored",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    skills = _collect_pack_skills_from_repo(
+        repo_dir=repo_dir,
+        source_url="https://github.com/example/oversized-pack",
+        branch="main",
+    )
+
+    assert len(skills) == 1
+    assert (
+        skills[0].source_url
+        == "https://github.com/example/oversized-pack/tree/main/skills/ignored"
+    )
+    assert skills[0].name == "Huge Index Skill"

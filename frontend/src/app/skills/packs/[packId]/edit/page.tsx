@@ -73,12 +73,17 @@ export default function EditSkillPackPage() {
             sourceUrl: pack.source_url,
             name: pack.name,
             description: pack.description ?? "",
+            branch: pack.branch || "main",
           }}
           sourceLabel="Pack URL"
           nameLabel="Pack name (optional)"
           descriptionLabel="Pack description (optional)"
+          branchLabel="Pack branch (optional)"
+          branchPlaceholder="main"
+          showBranch
           descriptionPlaceholder="Short summary shown in the packs list."
           requiredUrlMessage="Pack URL is required."
+          invalidUrlMessage="Pack URL must be a GitHub repository URL (https://github.com/<owner>/<repo>)."
           submitLabel="Save changes"
           submittingLabel="Saving..."
           isSubmitting={saveMutation.isPending}
@@ -90,6 +95,8 @@ export default function EditSkillPackPage() {
                 source_url: values.sourceUrl,
                 name: values.name || undefined,
                 description: values.description || undefined,
+                branch: values.branch || "main",
+                metadata: pack.metadata || {},
               },
             });
             if (result.status !== 200) {

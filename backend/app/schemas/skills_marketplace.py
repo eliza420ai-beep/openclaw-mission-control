@@ -6,7 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 from pydantic import AnyHttpUrl
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 
 from app.schemas.common import NonEmptyStr
 
@@ -27,6 +27,8 @@ class SkillPackCreate(SQLModel):
     source_url: AnyHttpUrl
     name: NonEmptyStr | None = None
     description: str | None = None
+    branch: str = "main"
+    metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class MarketplaceSkillRead(SQLModel):
@@ -40,6 +42,7 @@ class MarketplaceSkillRead(SQLModel):
     risk: str | None = None
     source: str | None = None
     source_url: str
+    metadata: dict[str, object]
     created_at: datetime
     updated_at: datetime
 
@@ -52,6 +55,8 @@ class SkillPackRead(SQLModel):
     name: str
     description: str | None = None
     source_url: str
+    branch: str
+    metadata: dict[str, object]
     skill_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -81,3 +86,4 @@ class SkillPackSyncResponse(SQLModel):
     synced: int
     created: int
     updated: int
+    warnings: list[str] = Field(default_factory=list)

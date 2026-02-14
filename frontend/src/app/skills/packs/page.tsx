@@ -24,7 +24,13 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useOrganizationMembership } from "@/lib/use-organization-membership";
 import { useUrlSorting } from "@/lib/use-url-sorting";
 
-const PACKS_SORTABLE_COLUMNS = ["name", "source_url", "skill_count", "updated_at"];
+const PACKS_SORTABLE_COLUMNS = [
+  "name",
+  "source_url",
+  "branch",
+  "skill_count",
+  "updated_at",
+];
 
 export default function SkillsPacksPage() {
   const queryClient = useQueryClient();
@@ -32,6 +38,9 @@ export default function SkillsPacksPage() {
   const { isAdmin } = useOrganizationMembership(isSignedIn);
   const [deleteTarget, setDeleteTarget] = useState<SkillPackRead | null>(null);
   const [syncingPackIds, setSyncingPackIds] = useState<Set<string>>(new Set());
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [syncAllError, setSyncAllError] = useState<string | null>(null);
+  const [syncWarnings, setSyncWarnings] = useState<string[]>([]);
 
   const { sorting, onSortingChange } = useUrlSorting({
     allowedColumnIds: PACKS_SORTABLE_COLUMNS,
@@ -91,7 +100,9 @@ export default function SkillsPacksPage() {
   };
 
   const handleSyncPack = async (pack: SkillPackRead) => {
-    if (syncingPackIds.has(pack.id)) return;
+    if (isSyncingAll || syncingPackIds.has(pack.id)) return;
+    setSyncAllError(null);
+    setSyncWarnings([]);
 
     setSyncingPackIds((previous) => {
       const next = new Set(previous);
@@ -99,14 +110,63 @@ export default function SkillsPacksPage() {
       return next;
     });
     try {
-      await syncMutation.mutateAsync({
+      const response = await syncMutation.mutateAsync({
         packId: pack.id,
       });
+      setSyncWarnings(response.data.warnings ?? []);
     } finally {
       setSyncingPackIds((previous) => {
         const next = new Set(previous);
         next.delete(pack.id);
         return next;
+      });
+    }
+  };
+
+  const handleSyncAllPacks = async () => {
+    if (!isAdmin || isSyncingAll || syncingPackIds.size > 0 || packs.length === 0) {
+      return;
+    }
+
+    setSyncAllError(null);
+    setSyncWarnings([]);
+    setIsSyncingAll(true);
+
+    try {
+      let hasFailure = false;
+
+      for (const pack of packs) {
+        if (!pack.id) continue;
+        setSyncingPackIds((previous) => {
+          const next = new Set(previous);
+          next.add(pack.id);
+          return next;
+        });
+
+        try {
+          const response = await syncMutation.mutateAsync({ packId: pack.id });
+          setSyncWarnings((previous) => [
+            ...previous,
+            ...(response.data.warnings ?? []),
+          ]);
+        } catch {
+          hasFailure = true;
+        } finally {
+          setSyncingPackIds((previous) => {
+            const next = new Set(previous);
+            next.delete(pack.id);
+            return next;
+          });
+        }
+      }
+
+      if (hasFailure) {
+        setSyncAllError("Some skill packs failed to sync. Please try again.");
+      }
+    } finally {
+      setIsSyncingAll(false);
+      await queryClient.invalidateQueries({
+        queryKey: packsQueryKey,
       });
     }
   };
@@ -122,12 +182,31 @@ export default function SkillsPacksPage() {
         description={`${packs.length} pack${packs.length === 1 ? "" : "s"} configured.`}
         headerActions={
           isAdmin ? (
-            <Link
-              href="/skills/packs/new"
-              className={buttonVariants({ variant: "primary", size: "md" })}
-            >
-              Add pack
-            </Link>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className={buttonVariants({
+                  variant: "outline",
+                  size: "md",
+                })}
+                disabled={
+                  isSyncingAll ||
+                  syncingPackIds.size > 0 ||
+                  packs.length === 0
+                }
+                onClick={() => {
+                  void handleSyncAllPacks();
+                }}
+              >
+                {isSyncingAll ? "Syncing all..." : "Sync all"}
+              </button>
+              <Link
+                href="/skills/packs/new"
+                className={buttonVariants({ variant: "primary", size: "md" })}
+              >
+                Add pack
+              </Link>
+            </div>
           ) : null
         }
         isAdmin={isAdmin}
@@ -166,6 +245,18 @@ export default function SkillsPacksPage() {
           ) : null}
           {syncMutation.error ? (
             <p className="text-sm text-rose-600">{syncMutation.error.message}</p>
+          ) : null}
+          {syncAllError ? (
+            <p className="text-sm text-rose-600">{syncAllError}</p>
+          ) : null}
+          {syncWarnings.length > 0 ? (
+            <div className="space-y-1">
+              {syncWarnings.map((warning) => (
+                <p key={warning} className="text-sm text-amber-600">
+                  {warning}
+                </p>
+              ))}
+            </div>
           ) : null}
         </div>
       </DashboardPageLayout>

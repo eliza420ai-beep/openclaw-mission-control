@@ -9,8 +9,10 @@
  * Payload used to register a pack URL in the organization.
  */
 export interface SkillPackCreate {
+  branch?: string;
   description?: string | null;
   name?: string | null;
+  metadata?: Record<string, object>;
   /** @minLength 1 */
   source_url: string;
 }

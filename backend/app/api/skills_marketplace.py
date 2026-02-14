@@ -52,6 +52,20 @@ ALLOWED_PACK_SOURCE_SCHEMES = {"https"}
 GIT_CLONE_TIMEOUT_SECONDS = 30
 GIT_REV_PARSE_TIMEOUT_SECONDS = 10
 BRANCH_NAME_ALLOWED_RE = r"^[A-Za-z0-9._/\-]+$"
+SKILLS_INDEX_READ_CHUNK_BYTES = 16 * 1024
+
+
+def _normalize_pack_branch(raw_branch: str | None) -> str:
+    if not raw_branch:
+        return "main"
+    normalized = raw_branch.strip()
+    if not normalized:
+        return "main"
+    if any(ch in normalized for ch in {"\n", "\r", "\t"}):
+        return "main"
+    if not re.match(BRANCH_NAME_ALLOWED_RE, normalized):
+        return "main"
+    return normalized
 
 
 @dataclass(frozen=True)
@@ -64,6 +78,7 @@ class PackSkillCandidate:
     category: str | None = None
     risk: str | None = None
     source: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 def _skills_install_dir(workspace_root: str) -> str:
@@ -145,6 +160,11 @@ def _normalize_repo_source_url(source_url: str) -> str:
     return normalized
 
 
+def _normalize_pack_source_url(source_url: str) -> str:
+    """Normalize pack repository source URLs for uniqueness checks."""
+    return _normalize_repo_source_url(source_url)
+
+
 def _validate_pack_source_url(source_url: str) -> None:
     """Validate that a skill pack source URL is safe to clone.
 
@@ -167,6 +187,17 @@ def _validate_pack_source_url(source_url: str) -> None:
 
     if host in {"localhost"}:
         raise ValueError("Pack source URL hostname is not allowed")
+
+    if host != "github.com":
+        raise ValueError(
+            "Pack source URL must be a GitHub repository URL (https://github.com/<owner>/<repo>)"
+        )
+
+    path = parsed.path.strip("/")
+    if not path or path.count("/") < 1:
+        raise ValueError(
+            "Pack source URL must be a GitHub repository URL (https://github.com/<owner>/<repo>)"
+        )
 
     try:
         ip = ipaddress.ip_address(host)
@@ -236,31 +267,185 @@ def _coerce_index_entries(payload: object) -> list[dict[str, object]]:
     return []
 
 
+class _StreamingJSONReader:
+    """Incrementally decode JSON content from a file object."""
+
+    def __init__(self, file_obj):
+        self._file_obj = file_obj
+        self._buffer = ""
+        self._position = 0
+        self._eof = False
+        self._decoder = json.JSONDecoder()
+
+    def _fill_buffer(self) -> None:
+        if self._eof:
+            return
+
+        chunk = self._file_obj.read(SKILLS_INDEX_READ_CHUNK_BYTES)
+        if not chunk:
+            self._eof = True
+            return
+        self._buffer += chunk
+
+    def _peek(self) -> str | None:
+        self._skip_whitespace()
+        if self._position >= len(self._buffer):
+            return None
+        return self._buffer[self._position]
+
+    def _skip_whitespace(self) -> None:
+        while True:
+            while self._position < len(self._buffer) and self._buffer[self._position].isspace():
+                self._position += 1
+
+            if self._position < len(self._buffer):
+                return
+
+            self._fill_buffer()
+            if self._position < len(self._buffer):
+                return
+            if self._eof:
+                return
+
+    def _decode_value(self):
+        self._skip_whitespace()
+
+        while True:
+            try:
+                value, end = self._decoder.raw_decode(self._buffer, self._position)
+                self._position = end
+                return value
+            except json.JSONDecodeError:
+                if self._eof:
+                    raise RuntimeError("skills_index.json is not valid JSON")
+                self._fill_buffer()
+                self._skip_whitespace()
+                if self._position >= len(self._buffer):
+                    if self._eof:
+                        raise RuntimeError("skills_index.json is not valid JSON")
+
+    def _consume_char(self, expected: str) -> None:
+        self._skip_whitespace()
+        if self._position >= len(self._buffer):
+            self._fill_buffer()
+            self._skip_whitespace()
+        if self._position >= len(self._buffer):
+            raise RuntimeError("skills_index.json is not valid JSON")
+
+        actual = self._buffer[self._position]
+        if actual != expected:
+            raise RuntimeError("skills_index.json is not valid JSON")
+        self._position += 1
+
+    def read_top_level_entries(self) -> list[dict[str, object]]:
+        self._fill_buffer()
+        self._skip_whitespace()
+        first = self._peek()
+        if first is None:
+            raise RuntimeError("skills_index.json is not valid JSON")
+
+        if first == "[":
+            self._position += 1
+            return list(self._read_array_values())
+        if first == "{":
+            self._position += 1
+            return list(self._read_skills_from_object())
+        raise RuntimeError("skills_index.json is not valid JSON")
+
+    def _read_array_values(self):
+        while True:
+            self._skip_whitespace()
+            current = self._peek()
+            if current is None:
+                if self._eof:
+                    raise RuntimeError("skills_index.json is not valid JSON")
+                continue
+            if current == "]":
+                self._position += 1
+                return
+
+            if current == ",":
+                self._position += 1
+                continue
+
+            entry = self._decode_value()
+            if isinstance(entry, dict):
+                yield entry
+
+    def _read_skills_from_object(self):
+        while True:
+            self._skip_whitespace()
+            current = self._peek()
+            if current is None:
+                if self._eof:
+                    raise RuntimeError("skills_index.json is not valid JSON")
+                continue
+
+            if current == "}":
+                self._position += 1
+                return
+
+            key = self._decode_value()
+            if not isinstance(key, str):
+                raise RuntimeError("skills_index.json is not valid JSON")
+
+            self._skip_whitespace()
+            if self._peek() == ":":
+                self._position += 1
+            else:
+                self._consume_char(":")
+
+            if key == "skills":
+                self._skip_whitespace()
+                current = self._peek()
+                if current is None:
+                    if self._eof:
+                        raise RuntimeError("skills_index.json is not valid JSON")
+                    continue
+
+                if current != "[":
+                    value = self._decode_value()
+                    if isinstance(value, list):
+                        for entry in value:
+                            if isinstance(entry, dict):
+                                yield entry
+                    continue
+
+                self._position += 1
+                yield from self._read_array_values()
+            else:
+                self._decode_value()
+
+            self._skip_whitespace()
+            current = self._peek()
+            if current == ",":
+                self._position += 1
+                continue
+            if current == "}":
+                self._position += 1
+                return
+
+
 def _collect_pack_skills_from_index(
     *,
     repo_dir: Path,
     source_url: str,
     branch: str,
+    discovery_warnings: list[str] | None = None,
 ) -> list[PackSkillCandidate] | None:
     index_file = repo_dir / "skills_index.json"
     if not index_file.is_file():
         return None
 
     try:
-        stat = index_file.stat()
+        with index_file.open(encoding="utf-8") as fp:
+            payload = _StreamingJSONReader(fp).read_top_level_entries()
     except OSError as exc:
         raise RuntimeError("unable to read skills_index.json") from exc
-
-    # Hard cap to avoid loading an arbitrarily large file into memory.
-    if stat.st_size > 256 * 1024:
-        raise RuntimeError("skills_index.json is too large")
-
-    try:
-        payload = json.loads(index_file.read_text(encoding="utf-8"))
-    except OSError as exc:
-        raise RuntimeError("unable to read skills_index.json") from exc
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("skills_index.json is not valid JSON") from exc
+    except RuntimeError as exc:
+        if discovery_warnings is not None:
+            discovery_warnings.append(f"Failed to parse skills_index.json: {exc}")
+        return None
 
     found: dict[str, PackSkillCandidate] = {}
     for entry in _coerce_index_entries(payload):
@@ -273,15 +458,22 @@ def _collect_pack_skills_from_index(
 
         indexed_source = entry.get("source_url")
         candidate_source_url: str | None = None
+        resolved_metadata: dict[str, object] = {
+                "discovery_mode": "skills_index",
+                "pack_branch": branch,
+        }
         if isinstance(indexed_source, str) and indexed_source.strip():
             source_candidate = indexed_source.strip()
+            resolved_metadata["source_url"] = source_candidate
             if source_candidate.startswith(("https://", "http://")):
                 candidate_source_url = source_candidate
             else:
                 indexed_rel = _normalize_repo_path(source_candidate)
+                resolved_metadata["resolved_path"] = indexed_rel
                 if indexed_rel:
                     candidate_source_url = _to_tree_source_url(source_url, branch, indexed_rel)
         elif has_indexed_path:
+            resolved_metadata["resolved_path"] = rel_path
             candidate_source_url = _to_tree_source_url(source_url, branch, rel_path)
 
         if not candidate_source_url:
@@ -326,6 +518,7 @@ def _collect_pack_skills_from_index(
             category=category,
             risk=risk,
             source=source_label,
+            metadata=resolved_metadata,
         )
 
     return list(found.values())
@@ -336,11 +529,13 @@ def _collect_pack_skills_from_repo(
     repo_dir: Path,
     source_url: str,
     branch: str,
+    discovery_warnings: list[str] | None = None,
 ) -> list[PackSkillCandidate]:
     indexed = _collect_pack_skills_from_index(
         repo_dir=repo_dir,
         source_url=source_url,
         branch=branch,
+        discovery_warnings=discovery_warnings,
     )
     if indexed is not None:
         return indexed
@@ -368,6 +563,11 @@ def _collect_pack_skills_from_repo(
             name=name,
             description=description,
             source_url=tree_url,
+            metadata={
+                "discovery_mode": "skills_md",
+                "pack_branch": branch,
+                "skill_dir": rel_dir,
+            },
         )
 
     if found:
@@ -376,16 +576,42 @@ def _collect_pack_skills_from_repo(
     return []
 
 
-def _collect_pack_skills(source_url: str) -> list[PackSkillCandidate]:
+def _collect_pack_skills(*, source_url: str, branch: str) -> list[PackSkillCandidate]:
     """Clone a pack repository and collect skills from index or `skills/**/SKILL.md`."""
+    return _collect_pack_skills_with_warnings(
+        source_url=source_url,
+        branch=branch,
+    )[0]
+
+
+def _collect_pack_skills_with_warnings(
+    *,
+    source_url: str,
+    branch: str,
+) -> tuple[list[PackSkillCandidate], list[str]]:
+    """Clone a pack repository and return discovered skills plus sync warnings."""
     # Defense-in-depth: validate again at point of use before invoking git.
     _validate_pack_source_url(source_url)
 
+    requested_branch = _normalize_pack_branch(branch)
+    discovery_warnings: list[str] = []
+
     with TemporaryDirectory(prefix="skill-pack-sync-") as tmp_dir:
         repo_dir = Path(tmp_dir)
+        used_branch = requested_branch
         try:
             subprocess.run(
-                ["git", "clone", "--depth", "1", source_url, str(repo_dir)],
+                [
+                    "git",
+                    "clone",
+                    "--depth",
+                    "1",
+                    "--single-branch",
+                    "--branch",
+                    requested_branch,
+                    source_url,
+                    str(repo_dir),
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -396,15 +622,35 @@ def _collect_pack_skills(source_url: str) -> list[PackSkillCandidate]:
         except subprocess.TimeoutExpired as exc:
             raise RuntimeError("timed out cloning pack repository") from exc
         except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or "").strip()
-            # Avoid reflecting arbitrary stderr to callers; keep details minimal.
-            detail = "unable to clone pack repository"
-            if stderr:
-                detail = f"{detail}: {stderr.splitlines()[0][:200]}"
-            raise RuntimeError(detail) from exc
+            if requested_branch != "main":
+                try:
+                    subprocess.run(
+                        ["git", "clone", "--depth", "1", source_url, str(repo_dir)],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=GIT_CLONE_TIMEOUT_SECONDS,
+                    )
+                    used_branch = "main"
+                except (
+                    FileNotFoundError,
+                    subprocess.TimeoutExpired,
+                    subprocess.CalledProcessError,
+                ):
+                    stderr = (exc.stderr or "").strip()
+                    detail = "unable to clone pack repository"
+                    if stderr:
+                        detail = f"{detail}: {stderr.splitlines()[0][:200]}"
+                    raise RuntimeError(detail) from exc
+            else:
+                stderr = (exc.stderr or "").strip()
+                detail = "unable to clone pack repository"
+                if stderr:
+                    detail = f"{detail}: {stderr.splitlines()[0][:200]}"
+                raise RuntimeError(detail) from exc
 
         try:
-            branch = subprocess.run(
+            discovered_branch = subprocess.run(
                 ["git", "-C", str(repo_dir), "rev-parse", "--abbrev-ref", "HEAD"],
                 check=True,
                 capture_output=True,
@@ -412,20 +658,16 @@ def _collect_pack_skills(source_url: str) -> list[PackSkillCandidate]:
                 timeout=GIT_REV_PARSE_TIMEOUT_SECONDS,
             ).stdout.strip()
         except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
-            branch = "main"
+            discovered_branch = used_branch or "main"
 
-        branch = branch or "main"
-        # Fail closed on weird output to avoid constructing malformed URLs.
-        if any(ch in branch for ch in {"\n", "\r", "\t"}):
-            branch = "main"
-
-        if not re.match(BRANCH_NAME_ALLOWED_RE, branch):
-            branch = "main"
-
-        return _collect_pack_skills_from_repo(
-            repo_dir=repo_dir,
-            source_url=source_url,
-            branch=branch,
+        return (
+            _collect_pack_skills_from_repo(
+                repo_dir=repo_dir,
+                source_url=source_url,
+                branch=_normalize_pack_branch(discovered_branch),
+                discovery_warnings=discovery_warnings,
+            ),
+            discovery_warnings,
         )
 
 
@@ -472,6 +714,7 @@ def _as_card(
         risk=skill.risk,
         source=skill.source,
         source_url=skill.source_url,
+        metadata=skill.metadata_ or {},
         created_at=skill.created_at,
         updated_at=skill.updated_at,
         installed=installation is not None,
@@ -486,6 +729,8 @@ def _as_skill_pack_read(pack: SkillPack) -> SkillPackRead:
         name=pack.name,
         description=pack.description,
         source_url=pack.source_url,
+        branch=pack.branch or "main",
+        metadata=pack.metadata_ or {},
         skill_count=0,
         created_at=pack.created_at,
         updated_at=pack.updated_at,
@@ -671,6 +916,9 @@ def _apply_pack_candidate_updates(
     if existing.source != candidate.source:
         existing.source = candidate.source
         changed = True
+    if existing.metadata_ != (candidate.metadata or {}):
+        existing.metadata_ = candidate.metadata or {}
+        changed = True
     return changed
 
 
@@ -720,6 +968,7 @@ async def create_marketplace_skill(
             session.add(existing)
             await session.commit()
             await session.refresh(existing)
+        existing.metadata_ = existing.metadata_ or {}
         return existing
 
     skill = MarketplaceSkill(
@@ -727,10 +976,12 @@ async def create_marketplace_skill(
         source_url=source_url,
         name=payload.name or _infer_skill_name(source_url),
         description=payload.description,
+        metadata={},
     )
     session.add(skill)
     await session.commit()
     await session.refresh(skill)
+    skill.metadata_ = skill.metadata_ or {}
     return skill
 
 
@@ -833,7 +1084,7 @@ async def create_skill_pack(
     ctx: OrganizationContext = ORG_ADMIN_DEP,
 ) -> SkillPackRead:
     """Register a new skill pack source URL."""
-    source_url = str(payload.source_url).strip()
+    source_url = _normalize_pack_source_url(str(payload.source_url))
     try:
         _validate_pack_source_url(source_url)
     except ValueError as exc:
@@ -851,6 +1102,13 @@ async def create_skill_pack(
         if payload.description is not None and existing.description != payload.description:
             existing.description = payload.description
             changed = True
+        normalized_branch = _normalize_pack_branch(payload.branch)
+        if existing.branch != normalized_branch:
+            existing.branch = normalized_branch
+            changed = True
+        if existing.metadata_ != payload.metadata:
+            existing.metadata_ = payload.metadata
+            changed = True
         if changed:
             existing.updated_at = utcnow()
             session.add(existing)
@@ -867,6 +1125,8 @@ async def create_skill_pack(
         source_url=source_url,
         name=payload.name or _infer_skill_name(source_url),
         description=payload.description,
+        branch=_normalize_pack_branch(payload.branch),
+        metadata_=payload.metadata,
     )
     session.add(pack)
     await session.commit()
@@ -887,7 +1147,7 @@ async def update_skill_pack(
 ) -> SkillPackRead:
     """Update a skill pack URL and metadata."""
     pack = await _require_skill_pack_for_org(pack_id=pack_id, session=session, ctx=ctx)
-    source_url = str(payload.source_url).strip()
+    source_url = _normalize_pack_source_url(str(payload.source_url))
     try:
         _validate_pack_source_url(source_url)
     except ValueError as exc:
@@ -906,6 +1166,8 @@ async def update_skill_pack(
     pack.source_url = source_url
     pack.name = payload.name or _infer_skill_name(source_url)
     pack.description = payload.description
+    pack.branch = _normalize_pack_branch(payload.branch)
+    pack.metadata_ = payload.metadata
     pack.updated_at = utcnow()
     session.add(pack)
     await session.commit()
@@ -945,7 +1207,10 @@ async def sync_skill_pack(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     try:
-        discovered = _collect_pack_skills(pack.source_url)
+        discovered, warnings = _collect_pack_skills_with_warnings(
+            source_url=pack.source_url,
+            branch=_normalize_pack_branch(pack.branch),
+        )
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -971,6 +1236,7 @@ async def sync_skill_pack(
                     category=candidate.category,
                     risk=candidate.risk,
                     source=candidate.source,
+                    metadata_=candidate.metadata or {},
                 ),
             )
             created += 1
@@ -989,4 +1255,5 @@ async def sync_skill_pack(
         synced=len(discovered),
         created=created,
         updated=updated,
+        warnings=warnings,
     )

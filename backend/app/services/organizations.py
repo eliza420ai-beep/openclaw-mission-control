@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
 from sqlmodel import col, select
 
@@ -16,6 +17,7 @@ from app.models.organization_board_access import OrganizationBoardAccess
 from app.models.organization_invite_board_access import OrganizationInviteBoardAccess
 from app.models.organization_invites import OrganizationInvite
 from app.models.organization_members import OrganizationMember
+from app.models.skill_packs import SkillPack
 from app.models.organizations import Organization
 from app.models.users import User
 
@@ -31,6 +33,30 @@ if TYPE_CHECKING:
     )
 
 DEFAULT_ORG_NAME = "Personal"
+
+
+def _normalize_skill_pack_source_url(source_url: str) -> str:
+    """Normalize pack source URL so duplicates with trivial formatting differences match."""
+    normalized = str(source_url).strip().rstrip("/")
+    if normalized.endswith(".git"):
+        return normalized[: -len(".git")]
+    return normalized
+
+
+DEFAULT_INSTALLER_SKILL_PACKS = (
+    (
+        "sickn33/antigravity-awesome-skills",
+        "antigravity-awesome-skills",
+        "The Ultimate Collection of 800+ Agentic Skills for Claude Code/Antigravity/Cursor. "
+        "Battle-tested, high-performance skills for AI agents including official skills from "
+        "Anthropic and Vercel.",
+    ),
+    (
+        "BrianRWagner/ai-marketing-skills",
+        "ai-marketing-skills",
+        "Marketing frameworks that AI actually executes. Use for Claude Code, OpenClaw, etc.",
+    ),
+)
 ADMIN_ROLES = {"owner", "admin"}
 ROLE_RANK = {"member": 0, "admin": 1, "owner": 2}
 
@@ -209,6 +235,40 @@ async def accept_invite(
     return member
 
 
+def _get_default_skill_pack_records(org_id: UUID, now: "datetime") -> list[SkillPack]:
+    """Build default installer skill pack rows for a new organization."""
+    source_base = "https://github.com"
+    seen_urls: set[str] = set()
+    records: list[SkillPack] = []
+    for repo, name, description in DEFAULT_INSTALLER_SKILL_PACKS:
+        source_url = _normalize_skill_pack_source_url(f"{source_base}/{repo}")
+        if source_url in seen_urls:
+            continue
+        seen_urls.add(source_url)
+        records.append(
+            SkillPack(
+                organization_id=org_id,
+                name=name,
+                description=description,
+                source_url=source_url,
+                created_at=now,
+                updated_at=now,
+            ),
+        )
+    return records
+
+
+async def _fetch_existing_default_pack_sources(
+    session: AsyncSession,
+    org_id: UUID,
+) -> set[str]:
+    """Return existing default skill pack URLs for the organization."""
+    return {
+        _normalize_skill_pack_source_url(row.source_url)
+        for row in await SkillPack.objects.filter_by(organization_id=org_id).all(session)
+    }
+
+
 async def ensure_member_for_user(
     session: AsyncSession,
     user: User,
@@ -250,10 +310,36 @@ async def ensure_member_for_user(
         created_at=now,
         updated_at=now,
     )
+    default_skill_packs = _get_default_skill_pack_records(org_id=org_id, now=now)
+    existing_pack_urls = await _fetch_existing_default_pack_sources(session, org_id)
     user.active_organization_id = org_id
     session.add(user)
     session.add(member)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as err:
+        await session.rollback()
+        existing_member = await get_first_membership(session, user.id)
+        if existing_member is None:
+            raise
+        if user.active_organization_id != existing_member.organization_id:
+            user.active_organization_id = existing_member.organization_id
+            session.add(user)
+            await session.commit()
+        await session.refresh(existing_member)
+        return existing_member
+
+    for pack in default_skill_packs:
+        if pack.source_url in existing_pack_urls:
+            continue
+        session.add(pack)
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            existing_pack_urls.add(pack.source_url)
+            continue
+
     await session.refresh(member)
     return member
 

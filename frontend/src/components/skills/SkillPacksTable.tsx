@@ -84,6 +84,11 @@ export function SkillPacksTable({
         ),
       },
       {
+        accessorKey: "branch",
+        header: "Branch",
+        cell: ({ row }) => <p className="text-sm text-slate-900">{row.original.branch || "main"}</p>,
+      },
+      {
         accessorKey: "skill_count",
         header: "Skills",
         cell: ({ row }) => (

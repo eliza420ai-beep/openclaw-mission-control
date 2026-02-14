@@ -36,7 +36,11 @@ export default function NewSkillPackPage() {
         nameLabel="Pack name (optional)"
         descriptionLabel="Pack description (optional)"
         descriptionPlaceholder="Short summary shown in the packs list."
+        branchLabel="Pack branch (optional)"
+        branchPlaceholder="main"
+        showBranch
         requiredUrlMessage="Pack URL is required."
+        invalidUrlMessage="Pack URL must be a GitHub repository URL (https://github.com/<owner>/<repo>)."
         submitLabel="Add pack"
         submittingLabel="Adding..."
         isSubmitting={createMutation.isPending}
@@ -47,6 +51,8 @@ export default function NewSkillPackPage() {
               source_url: values.sourceUrl,
               name: values.name || undefined,
               description: values.description || undefined,
+              branch: values.branch || "main",
+              metadata: {},
             },
           });
           if (result.status !== 200) {

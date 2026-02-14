@@ -11,6 +11,7 @@
 export interface SkillPackSyncResponse {
   created: number;
   ok?: boolean;
+  warnings: string[];
   pack_id: string;
   synced: number;
   updated: number;

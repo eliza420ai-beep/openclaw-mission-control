@@ -12,8 +12,10 @@ export interface SkillPackRead {
   created_at: string;
   description?: string | null;
   id: string;
+  branch: string;
   name: string;
   organization_id: string;
+  metadata: Record<string, object>;
   skill_count?: number;
   source_url: string;
   updated_at: string;

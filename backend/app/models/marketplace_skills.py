@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from sqlalchemy import JSON, Column
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field
 
@@ -34,5 +35,9 @@ class MarketplaceSkill(TenantScoped, table=True):
     risk: str | None = Field(default=None)
     source: str | None = Field(default=None)
     source_url: str
+    metadata_: dict[str, object] = Field(
+        default_factory=dict,
+        sa_column=Column("metadata", JSON, nullable=False),
+    )
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

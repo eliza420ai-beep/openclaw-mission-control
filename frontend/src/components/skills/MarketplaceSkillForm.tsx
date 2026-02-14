@@ -9,6 +9,7 @@ type MarketplaceSkillFormValues = {
   sourceUrl: string;
   name: string;
   description: string;
+  branch: string;
 };
 
 type MarketplaceSkillFormProps = {
@@ -21,9 +22,14 @@ type MarketplaceSkillFormProps = {
   namePlaceholder?: string;
   descriptionLabel?: string;
   descriptionPlaceholder?: string;
+  branchLabel?: string;
+  branchPlaceholder?: string;
+  defaultBranch?: string;
   requiredUrlMessage?: string;
+  invalidUrlMessage?: string;
   submitLabel: string;
   submittingLabel: string;
+  showBranch?: boolean;
   isSubmitting: boolean;
   onCancel: () => void;
   onSubmit: (values: MarketplaceSkillFormValues) => Promise<void>;
@@ -33,6 +39,7 @@ const DEFAULT_VALUES: MarketplaceSkillFormValues = {
   sourceUrl: "",
   name: "",
   description: "",
+  branch: "main",
 };
 
 const extractErrorMessage = (error: unknown, fallback: string) => {
@@ -51,7 +58,12 @@ export function MarketplaceSkillForm({
   namePlaceholder = "Deploy Helper",
   descriptionLabel = "Description (optional)",
   descriptionPlaceholder = "Short summary shown in the marketplace.",
+  branchLabel = "Branch (optional)",
+  branchPlaceholder = "main",
+  defaultBranch = "main",
+  showBranch = false,
   requiredUrlMessage = "Skill URL is required.",
+  invalidUrlMessage = "Skill URL must be a GitHub repository URL (https://github.com/<owner>/<repo>).",
   submitLabel,
   submittingLabel,
   isSubmitting,
@@ -59,16 +71,40 @@ export function MarketplaceSkillForm({
   onSubmit,
 }: MarketplaceSkillFormProps) {
   const resolvedInitial = initialValues ?? DEFAULT_VALUES;
+  const normalizedDefaultBranch = defaultBranch.trim() || "main";
   const [sourceUrl, setSourceUrl] = useState(resolvedInitial.sourceUrl);
   const [name, setName] = useState(resolvedInitial.name);
   const [description, setDescription] = useState(resolvedInitial.description);
+  const [branch, setBranch] = useState(
+    resolvedInitial.branch?.trim() || normalizedDefaultBranch,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const isValidSourceUrl = (value: string) => {
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol !== "https:") return false;
+      if (parsed.hostname !== "github.com") return false;
+      const parts = parsed.pathname
+        .split("/")
+        .map((segment) => segment.trim())
+        .filter((segment) => segment.length > 0);
+      return parts.length >= 2;
+    } catch {
+      return false;
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedUrl = sourceUrl.trim();
     if (!normalizedUrl) {
       setErrorMessage(requiredUrlMessage);
+      return;
+    }
+
+    if (!isValidSourceUrl(normalizedUrl)) {
+      setErrorMessage(invalidUrlMessage);
       return;
     }
 
@@ -79,6 +115,7 @@ export function MarketplaceSkillForm({
         sourceUrl: normalizedUrl,
         name: name.trim(),
         description: description.trim(),
+        branch: branch.trim() || normalizedDefaultBranch,
       });
     } catch (error) {
       setErrorMessage(extractErrorMessage(error, "Unable to save skill."));
@@ -111,6 +148,24 @@ export function MarketplaceSkillForm({
             <p className="text-xs text-slate-500">{sourceUrlHelpText}</p>
           ) : null}
         </div>
+
+        {showBranch ? (
+          <div className="space-y-2">
+            <label
+              htmlFor="skill-branch"
+              className="text-xs font-semibold uppercase tracking-wider text-slate-500"
+            >
+              {branchLabel}
+            </label>
+            <Input
+              id="skill-branch"
+              value={branch}
+              onChange={(event) => setBranch(event.target.value)}
+              placeholder={branchPlaceholder}
+              disabled={isSubmitting}
+            />
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <label
