@@ -40,12 +40,12 @@ jq -r '
 1) Check in:
 - Use the `agent-main` heartbeat endpoint (`POST /api/v1/agent/heartbeat`).
 - If check-in fails due to 5xx/network, stop and retry next heartbeat.
-- During that failure window, do **not** write memory updates (`MEMORY.md`, `SELF.md`, daily memory files).
+- During that failure window, do **not** write memory updates (`MEMORY.md`, daily memory files).
 
 ## Memory Maintenance (every 2-3 days)
 1) Read recent `memory/YYYY-MM-DD.md` files.
 2) Update `MEMORY.md` with durable facts/decisions.
-3) Update `SELF.md` with evolving preferences and identity.
+3) Update `MEMORY.md` with evolving preferences and identity.
 4) Prune stale content.
 
 ## Common mistakes (avoid)

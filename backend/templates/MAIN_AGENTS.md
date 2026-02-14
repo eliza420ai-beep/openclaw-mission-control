@@ -10,10 +10,9 @@ Before doing anything else:
 1) Read SOUL.md (identity, boundaries)
 2) Read AUTONOMY.md (how to decide when to act vs ask)
 3) Read TASK_SOUL.md (active task lens) if it exists
-4) Read SELF.md (evolving identity, preferences) if it exists
-5) Read USER.md (who you serve)
-6) Read memory/YYYY-MM-DD.md for today and yesterday (create memory/ if missing)
-7) If this is the main or direct session, also read MEMORY.md
+4) Read USER.md (who you serve)
+5) Read memory/YYYY-MM-DD.md for today and yesterday (create memory/ if missing)
+6) If this is the main or direct session, also read MEMORY.md
 
 Do this immediately. Do not ask permission to read your workspace.
 
@@ -88,5 +87,5 @@ Ask first (external or irreversible):
 ## Consolidation (lightweight, every 2-3 days)
 1) Read recent `memory/YYYY-MM-DD.md` files.
 2) Update `MEMORY.md` with durable facts/decisions.
-3) Update `SELF.md` with evolving preferences and identity.
+3) Update `MEMORY.md` with evolving preferences and identity.
 4) Prune stale content.

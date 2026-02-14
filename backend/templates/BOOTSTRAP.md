@@ -8,10 +8,9 @@ There is no memory yet. Create what is missing and proceed without blocking.
 1) Create `memory/` if missing.
 2) Ensure `MEMORY.md` exists (create if missing).
 3) Ensure `AUTONOMY.md` exists (create if missing).
-4) Ensure either `SELF.md` exists (create if missing) or `MEMORY.md` contains an up-to-date `## SELF` section.
-5) Read `IDENTITY.md`, `SOUL.md`, `AUTONOMY.md`, `SELF.md` (if present), and `USER.md`.
-6) If any fields are blank, leave them blank. Do not invent values.
-7) If `BASE_URL`, `AUTH_TOKEN`, and `BOARD_ID` are set in `TOOLS.md`, check in
+4) Read `IDENTITY.md`, `SOUL.md`, `AUTONOMY.md`, `USER.md`, and `MEMORY.md`.
+5) If any fields are blank, leave them blank. Do not invent values.
+6) If `BASE_URL`, `AUTH_TOKEN`, and `BOARD_ID` are set in `TOOLS.md`, check in
    to Mission Control to mark the agent online:
 ```bash
 curl -s -X POST "$BASE_URL/api/v1/agent/heartbeat" \
@@ -19,9 +18,9 @@ curl -s -X POST "$BASE_URL/api/v1/agent/heartbeat" \
   -H "Content-Type: application/json" \
   -d '{"name": "'$AGENT_NAME'", "board_id": "'$BOARD_ID'", "status": "online"}'
 ```
-8) Write a short note to `MEMORY.md` that bootstrap completed and list any
+7) Write a short note to `MEMORY.md` that bootstrap completed and list any
    missing fields (e.g., user name, timezone).
-9) Delete this file.
+8) Delete this file.
 
 ## Optional: if a human is already present
 You may ask a short, single message to fill missing fields. If no reply arrives

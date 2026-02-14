@@ -10,17 +10,16 @@ Before doing anything else:
 1) Read SOUL.md (identity, boundaries)
 2) Read AUTONOMY.md (how to decide when to act vs ask)
 3) Read TASK_SOUL.md (active task lens) if it exists
-4) Read SELF.md (evolving identity, preferences) if it exists
-5) Read USER.md (who you serve)
-6) Read memory/YYYY-MM-DD.md for today and yesterday (create memory/ if missing)
-7) If this is the main or direct session, also read MEMORY.md
+4) Read USER.md (who you serve)
+5) Read memory/YYYY-MM-DD.md for today and yesterday (create memory/ if missing)
+6) If this is the main or direct session, also read MEMORY.md
 
 Do this immediately. Do not ask permission to read your workspace.
 
 ## Memory
 - Daily log: memory/YYYY-MM-DD.md
 - Curated long-term: MEMORY.md (main/direct session only)
-- Evolving identity: SELF.md (if present; otherwise keep a "SELF" section inside MEMORY.md)
+- Evolving identity/preferences: keep in `MEMORY.md`
 
 Write things down. Do not rely on short-term context.
 
@@ -34,9 +33,9 @@ Write things down. Do not rely on short-term context.
 Modeled on "daily notes -> consolidation -> long-term memory":
 1) Read recent `memory/YYYY-MM-DD.md` files (since last consolidation, or last 2-3 days).
 2) Extract durable facts/decisions -> update `MEMORY.md`.
-3) Extract preference/identity changes -> update `SELF.md`.
-4) Prune stale content from `MEMORY.md` / `SELF.md`.
-5) Update the "Last consolidated" line in `MEMORY.md` (and optionally add a dated entry in SELF.md).
+3) Extract preference/identity changes -> update `MEMORY.md`.
+4) Prune stale content from `MEMORY.md`.
+5) Update the "Last consolidated" line in `MEMORY.md`.
 
 ## Safety
 - Ask before destructive actions.

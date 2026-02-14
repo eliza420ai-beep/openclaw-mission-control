@@ -22,4 +22,4 @@ Before substantial work on a task, write or refresh these fields:
 - Update when task context changes materially.
 - Do not store secrets.
 - Do not rewrite `SOUL.md` for routine task shifts.
-- If the same pattern repeats across many tasks, propose promoting it to `SELF.md` (or `SOUL.md` if truly core).
+- If the same pattern repeats across many tasks, propose promoting it to `MEMORY.md` (or `SOUL.md` if truly core).

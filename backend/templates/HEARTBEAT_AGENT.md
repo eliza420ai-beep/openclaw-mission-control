@@ -97,7 +97,7 @@ jq -r '
 - On pre-flight failure, do **not** write any memory or task updates:
   - no board/group memory writes,
   - no task comments/status changes,
-  - no local `MEMORY.md` / `SELF.md` / daily memory writes.
+  - no local `MEMORY.md` / daily memory writes.
 
 ## Heartbeat checklist (run in order)
 1) Check in:

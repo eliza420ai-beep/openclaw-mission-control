@@ -31,10 +31,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   DEFAULT_IDENTITY_PROFILE,
-  DEFAULT_SOUL_TEMPLATE,
 } from "@/lib/agent-templates";
 
 type IdentityProfile = {
@@ -121,9 +119,6 @@ export default function EditAgentPage() {
   const [identityProfile, setIdentityProfile] = useState<
     IdentityProfile | undefined
   >(undefined);
-  const [soulTemplate, setSoulTemplate] = useState<string | undefined>(
-    undefined,
-  );
   const [error, setError] = useState<string | null>(null);
 
   const boardsQuery = useListBoardsApiV1BoardsGet<
@@ -198,10 +193,6 @@ export default function EditAgentPage() {
     return withIdentityDefaults(null);
   }, [loadedAgent?.identity_profile]);
 
-  const loadedSoulTemplate = useMemo(() => {
-    return loadedAgent?.soul_template?.trim() || DEFAULT_SOUL_TEMPLATE;
-  }, [loadedAgent?.soul_template]);
-
   const isLoading =
     boardsQuery.isLoading || agentQuery.isLoading || updateMutation.isPending;
   const errorMessage =
@@ -213,7 +204,6 @@ export default function EditAgentPage() {
   const resolvedHeartbeatEvery = heartbeatEvery ?? loadedHeartbeat.every;
   const resolvedHeartbeatTarget = heartbeatTarget ?? loadedHeartbeat.target;
   const resolvedIdentityProfile = identityProfile ?? loadedIdentityProfile;
-  const resolvedSoulTemplate = soulTemplate ?? loadedSoulTemplate;
 
   const resolvedBoardId = useMemo(() => {
     if (resolvedIsGatewayMain) return boardId ?? "";
@@ -266,7 +256,6 @@ export default function EditAgentPage() {
         loadedAgent.identity_profile,
         resolvedIdentityProfile,
       ) as unknown as Record<string, unknown> | null,
-      soul_template: resolvedSoulTemplate.trim() || null,
     };
     if (!resolvedIsGatewayMain) {
       payload.board_id = resolvedBoardId || null;
@@ -439,7 +428,7 @@ export default function EditAgentPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Personality & behavior
           </p>
-          <div className="mt-4 space-y-6">
+          <div className="mt-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-900">
                 Communication style
@@ -452,17 +441,6 @@ export default function EditAgentPage() {
                     communication_style: event.target.value,
                   })
                 }
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-900">
-                Soul template
-              </label>
-              <Textarea
-                value={resolvedSoulTemplate}
-                onChange={(event) => setSoulTemplate(event.target.value)}
-                rows={10}
                 disabled={isLoading}
               />
             </div>

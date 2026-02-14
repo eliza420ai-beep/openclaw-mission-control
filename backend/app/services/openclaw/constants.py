@@ -55,9 +55,7 @@ DEFAULT_GATEWAY_FILES = frozenset(
     {
         "AGENTS.md",
         "SOUL.md",
-        "LEAD_PLAYBOOK.md",
         "TASK_SOUL.md",
-        "SELF.md",
         "AUTONOMY.md",
         "TOOLS.md",
         "IDENTITY.md",
@@ -69,14 +67,28 @@ DEFAULT_GATEWAY_FILES = frozenset(
     },
 )
 
+# Lead-only workspace contract. Used for board leads to allow an iterative rollout
+# without changing worker templates.
+LEAD_GATEWAY_FILES = frozenset(
+    {
+        "AGENTS.md",
+        "BOOTSTRAP.md",
+        "IDENTITY.md",
+        "SOUL.md",
+        "USER.md",
+        "MEMORY.md",
+        "TOOLS.md",
+        "HEARTBEAT.md",
+    },
+)
+
 # These files are intended to evolve within the agent workspace.
 # Provision them if missing, but avoid overwriting existing content during updates.
 #
 # Examples:
-# - SELF.md: evolving identity/preferences
 # - USER.md: human-provided context + lead intake notes
 # - MEMORY.md: curated long-term memory (consolidated)
-PRESERVE_AGENT_EDITABLE_FILES = frozenset({"SELF.md", "USER.md", "MEMORY.md", "TASK_SOUL.md"})
+PRESERVE_AGENT_EDITABLE_FILES = frozenset({"USER.md", "MEMORY.md", "TASK_SOUL.md"})
 
 HEARTBEAT_LEAD_TEMPLATE = "HEARTBEAT_LEAD.md"
 HEARTBEAT_AGENT_TEMPLATE = "HEARTBEAT_AGENT.md"
@@ -89,6 +101,17 @@ MAIN_TEMPLATE_MAP = {
     "USER.md": "MAIN_USER.md",
     "BOOT.md": "MAIN_BOOT.md",
     "TOOLS.md": "MAIN_TOOLS.md",
+}
+
+LEAD_TEMPLATE_MAP = {
+    "AGENTS.md": "LEAD_AGENTS.md",
+    "BOOTSTRAP.md": "LEAD_BOOTSTRAP.md",
+    "IDENTITY.md": "LEAD_IDENTITY.md",
+    "SOUL.md": "LEAD_SOUL.md",
+    "USER.md": "LEAD_USER.md",
+    "MEMORY.md": "LEAD_MEMORY.md",
+    "TOOLS.md": "LEAD_TOOLS.md",
+    "HEARTBEAT.md": "HEARTBEAT_LEAD.md",
 }
 
 _TOOLS_KV_RE = re.compile(r"^(?P<key>[A-Z0-9_]+)=(?P<value>.*)$")

@@ -28,6 +28,8 @@ from app.services.openclaw.constants import (
     HEARTBEAT_AGENT_TEMPLATE,
     HEARTBEAT_LEAD_TEMPLATE,
     IDENTITY_PROFILE_FIELDS,
+    LEAD_GATEWAY_FILES,
+    LEAD_TEMPLATE_MAP,
     MAIN_TEMPLATE_MAP,
     PRESERVE_AGENT_EDITABLE_FILES,
 )
@@ -230,6 +232,13 @@ def _build_context(
         "board_success_metrics": json.dumps(board.success_metrics or {}),
         "board_target_date": board.target_date.isoformat() if board.target_date else "",
         "board_goal_confirmed": str(board.goal_confirmed).lower(),
+        "board_rule_require_approval_for_done": str(board.require_approval_for_done).lower(),
+        "board_rule_require_review_before_done": str(board.require_review_before_done).lower(),
+        "board_rule_block_status_changes_with_pending_approval": str(
+            board.block_status_changes_with_pending_approval
+        ).lower(),
+        "board_rule_only_lead_can_change_status": str(board.only_lead_can_change_status).lower(),
+        "board_rule_max_agents": str(board.max_agents),
         "is_board_lead": str(agent.is_board_lead).lower(),
         "session_key": session_key,
         "workspace_path": workspace_path,
@@ -371,6 +380,10 @@ class GatewayControlPlane(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def delete_agent_file(self, *, agent_id: str, name: str) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     async def patch_agent_heartbeats(
         self,
         entries: list[tuple[str, str, dict[str, Any]]],
@@ -477,6 +490,13 @@ class OpenClawGatewayControlPlane(GatewayControlPlane):
             config=self._config,
         )
 
+    async def delete_agent_file(self, *, agent_id: str, name: str) -> None:
+        await openclaw_call(
+            "agents.files.delete",
+            {"agentId": agent_id, "name": name},
+            config=self._config,
+        )
+
     async def patch_agent_heartbeats(
         self,
         entries: list[tuple[str, str, dict[str, Any]]],
@@ -579,28 +599,49 @@ class BaseAgentLifecycleManager(ABC):
     ) -> dict[str, str]:
         raise NotImplementedError
 
-    def _template_overrides(self) -> dict[str, str] | None:
+    def _template_overrides(self, agent: Agent) -> dict[str, str] | None:
         return None
 
-    def _preserve_files(self) -> set[str]:
+    def _file_names(self, agent: Agent) -> set[str]:
+        _ = agent
+        return set(DEFAULT_GATEWAY_FILES)
+
+    def _preserve_files(self, agent: Agent) -> set[str]:
+        _ = agent
         """Files that are expected to evolve inside the agent workspace."""
         return set(PRESERVE_AGENT_EDITABLE_FILES)
+
+    def _allow_stale_file_deletion(self, agent: Agent) -> bool:
+        _ = agent
+        return False
+
+    def _stale_file_candidates(self, agent: Agent) -> set[str]:
+        _ = agent
+        return set()
 
     async def _set_agent_files(
         self,
         *,
+        agent: Agent | None = None,
         agent_id: str,
         rendered: dict[str, str],
+        desired_file_names: set[str] | None = None,
         existing_files: dict[str, dict[str, Any]],
         action: str,
     ) -> None:
+        preserve_files = (
+            self._preserve_files(agent) if agent is not None else set(PRESERVE_AGENT_EDITABLE_FILES)
+        )
+        target_file_names = desired_file_names or set(rendered.keys())
+        unsupported_names: list[str] = []
+
         for name, content in rendered.items():
             if content == "":
                 continue
             # Preserve "editable" files only during updates. During first-time provisioning,
-            # the gateway may pre-create defaults for USER/SELF/etc, and we still want to
+            # the gateway may pre-create defaults for USER/MEMORY/etc, and we still want to
             # apply Mission Control's templates.
-            if action == "update" and name in self._preserve_files():
+            if action == "update" and name in preserve_files:
                 entry = existing_files.get(name)
                 if entry and not bool(entry.get("missing")):
                     size = entry.get("size")
@@ -617,6 +658,38 @@ class BaseAgentLifecycleManager(ABC):
                 )
             except OpenClawGatewayError as exc:
                 if "unsupported file" in str(exc).lower():
+                    unsupported_names.append(name)
+                    continue
+                raise
+
+        if agent is not None and agent.is_board_lead and unsupported_names:
+            unsupported_sorted = ", ".join(sorted(set(unsupported_names)))
+            msg = (
+                "Gateway rejected required lead workspace files as unsupported: "
+                f"{unsupported_sorted}"
+            )
+            raise RuntimeError(msg)
+
+        if agent is None or not self._allow_stale_file_deletion(agent):
+            return
+
+        stale_names = (
+            set(existing_files.keys()) & self._stale_file_candidates(agent)
+        ) - target_file_names
+        for name in sorted(stale_names):
+            try:
+                await self._control_plane.delete_agent_file(agent_id=agent_id, name=name)
+            except OpenClawGatewayError as exc:
+                message = str(exc).lower()
+                if any(
+                    marker in message
+                    for marker in (
+                        "unsupported",
+                        "unknown method",
+                        "not found",
+                        "no such file",
+                    )
+                ):
                     continue
                 raise
 
@@ -657,7 +730,7 @@ class BaseAgentLifecycleManager(ABC):
         )
         # Always attempt to sync Mission Control's full template set.
         # Do not introspect gateway defaults (avoids touching gateway "main" agent state).
-        file_names = set(DEFAULT_GATEWAY_FILES)
+        file_names = self._file_names(agent)
         existing_files = await self._control_plane.list_agent_files(agent_id)
         include_bootstrap = _should_include_bootstrap(
             action=options.action,
@@ -669,12 +742,14 @@ class BaseAgentLifecycleManager(ABC):
             agent,
             file_names,
             include_bootstrap=include_bootstrap,
-            template_overrides=self._template_overrides(),
+            template_overrides=self._template_overrides(agent),
         )
 
         await self._set_agent_files(
+            agent=agent,
             agent_id=agent_id,
             rendered=rendered,
+            desired_file_names=set(rendered.keys()),
             existing_files=existing_files,
             action=options.action,
         )
@@ -699,6 +774,38 @@ class BoardAgentLifecycleManager(BaseAgentLifecycleManager):
             raise ValueError(msg)
         return _build_context(agent, board, self._gateway, auth_token, user)
 
+    def _template_overrides(self, agent: Agent) -> dict[str, str] | None:
+        if agent.is_board_lead:
+            return LEAD_TEMPLATE_MAP
+        return None
+
+    def _file_names(self, agent: Agent) -> set[str]:
+        if agent.is_board_lead:
+            return set(LEAD_GATEWAY_FILES)
+        return super()._file_names(agent)
+
+    def _allow_stale_file_deletion(self, agent: Agent) -> bool:
+        return bool(agent.is_board_lead)
+
+    def _stale_file_candidates(self, agent: Agent) -> set[str]:
+        if not agent.is_board_lead:
+            return set()
+        return (
+            set(DEFAULT_GATEWAY_FILES)
+            | set(LEAD_GATEWAY_FILES)
+            | {
+                "USER.md",
+                "ROUTING.md",
+                "LEARNINGS.md",
+                "BOOTSTRAP.md",
+                "BOOT.md",
+                "ROLE.md",
+                "WORKFLOW.md",
+                "STATUS.md",
+                "APIS.md",
+            }
+        )
+
 
 class GatewayMainAgentLifecycleManager(BaseAgentLifecycleManager):
     """Provisioning manager for organization gateway-main agents."""
@@ -717,13 +824,15 @@ class GatewayMainAgentLifecycleManager(BaseAgentLifecycleManager):
         _ = board
         return _build_main_context(agent, self._gateway, auth_token, user)
 
-    def _template_overrides(self) -> dict[str, str] | None:
+    def _template_overrides(self, agent: Agent) -> dict[str, str] | None:
+        _ = agent
         return MAIN_TEMPLATE_MAP
 
-    def _preserve_files(self) -> set[str]:
+    def _preserve_files(self, agent: Agent) -> set[str]:
+        _ = agent
         # For gateway-main agents, USER.md is system-managed (derived from org/user context),
         # so keep it in sync even during updates.
-        preserved = super()._preserve_files()
+        preserved = super()._preserve_files(agent)
         preserved.discard("USER.md")
         return preserved
 
@@ -767,7 +876,7 @@ def _should_include_bootstrap(
 def _wakeup_text(agent: Agent, *, verb: str) -> str:
     return (
         f"Hello {agent.name}. Your workspace has been {verb}.\n\n"
-        "Start the agent, run BOOT.md, and if BOOTSTRAP.md exists run it once "
+        "Start the agent, read AGENTS.md, and if BOOTSTRAP.md exists run it once "
         "then delete it. Begin heartbeats after startup."
     )
 
@@ -809,7 +918,7 @@ class OpenClawGatewayProvisioner:
 
         Lifecycle steps (same for all agent types):
         1) create agent (idempotent)
-        2) set/update all template files (best-effort for unsupported files)
+        2) set/update all template files
         3) wake the agent session (chat.send)
         """
 

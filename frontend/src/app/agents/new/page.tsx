@@ -28,11 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  DEFAULT_IDENTITY_PROFILE,
-  DEFAULT_SOUL_TEMPLATE,
-} from "@/lib/agent-templates";
+import { DEFAULT_IDENTITY_PROFILE } from "@/lib/agent-templates";
 
 type IdentityProfile = {
   role: string;
@@ -89,7 +85,6 @@ export default function NewAgentPage() {
   const [identityProfile, setIdentityProfile] = useState<IdentityProfile>({
     ...DEFAULT_IDENTITY_PROFILE,
   });
-  const [soulTemplate, setSoulTemplate] = useState(DEFAULT_SOUL_TEMPLATE);
   const [error, setError] = useState<string | null>(null);
 
   const boardsQuery = useListBoardsApiV1BoardsGet<
@@ -147,7 +142,6 @@ export default function NewAgentPage() {
         identity_profile: normalizeIdentityProfile(
           identityProfile,
         ) as unknown as Record<string, unknown> | null,
-        soul_template: soulTemplate.trim() || null,
       },
     });
   };
@@ -260,7 +254,7 @@ export default function NewAgentPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
             Personality & behavior
           </p>
-          <div className="mt-4 space-y-6">
+          <div className="mt-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-900">
                 Communication style
@@ -273,17 +267,6 @@ export default function NewAgentPage() {
                     communication_style: event.target.value,
                   }))
                 }
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-900">
-                Soul template
-              </label>
-              <Textarea
-                value={soulTemplate}
-                onChange={(event) => setSoulTemplate(event.target.value)}
-                rows={10}
                 disabled={isLoading}
               />
             </div>

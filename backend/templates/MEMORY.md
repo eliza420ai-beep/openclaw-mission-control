@@ -2,12 +2,7 @@
 
 This is curated knowledge. Update it during consolidation, not constantly during sessions.
 
-Use this for durable facts, decisions, constraints, and recurring patterns. Use `SELF.md` for
-evolving identity and preferences.
-
-## SELF (fallback if SELF.md is absent)
-
-If there is no separate `SELF.md` in this workspace, keep evolving identity/preferences here.
+Use this for durable facts, decisions, constraints, recurring patterns, and evolving identity/preferences.
 Update during consolidation, not constantly.
 
 - Preferences / working style:

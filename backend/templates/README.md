@@ -16,7 +16,6 @@ Use these templates to control what an agent sees in workspace files like:
 - `IDENTITY.md`
 - `USER.md`
 - `MEMORY.md`
-- `LEAD_PLAYBOOK.md` (supplemental lead examples/reference)
 
 When a gateway template sync runs, these templates are rendered with agent/board context and written into each workspace.
 
@@ -58,13 +57,32 @@ python backend/scripts/sync_gateway_templates.py --gateway-id <uuid>
 
 ## Files included in sync
 
-Default synced files are defined in:
+Board-agent default synced files are defined in:
 
 - `backend/app/services/openclaw/constants.py` (`DEFAULT_GATEWAY_FILES`)
+
+Board-lead file contract is defined in:
+
+- `backend/app/services/openclaw/constants.py` (`LEAD_GATEWAY_FILES`)
+
+Template mapping for board leads is defined in:
+
+- `backend/app/services/openclaw/constants.py` (`LEAD_TEMPLATE_MAP`)
 
 Main-agent template mapping is defined in:
 
 - `backend/app/services/openclaw/constants.py` (`MAIN_TEMPLATE_MAP`)
+
+Provisioning selection logic is implemented in:
+
+- `backend/app/services/openclaw/provisioning.py`
+  - `BoardAgentLifecycleManager._file_names()`
+  - `BoardAgentLifecycleManager._template_overrides()`
+  - `GatewayMainAgentLifecycleManager._template_overrides()`
+
+Lead-only stale template files are cleaned up during sync by:
+
+- `BoardAgentLifecycleManager._stale_file_candidates()`
 
 ## HEARTBEAT.md selection logic
 
@@ -77,6 +95,14 @@ See:
 
 - `HEARTBEAT_LEAD_TEMPLATE`, `HEARTBEAT_AGENT_TEMPLATE` in constants
 - `_heartbeat_template_name()` in provisioning
+
+## OpenAPI refresh location
+
+Lead OpenAPI download/index generation is intentionally documented in:
+
+- `LEAD_TOOLS.md`
+
+This avoids relying on BOOT hook execution to populate `api/openapi.json`.
 
 ## Template variables reference
 
@@ -103,6 +129,11 @@ See:
 - `board_objective`, `board_success_metrics`, `board_target_date`
 - `board_goal_confirmed`, `is_board_lead`
 - `workspace_path`
+- `board_rule_require_approval_for_done`
+- `board_rule_require_review_before_done`
+- `board_rule_block_status_changes_with_pending_approval`
+- `board_rule_only_lead_can_change_status`
+- `board_rule_max_agents`
 
 ## OpenAPI role tags for agents
 
@@ -129,7 +160,7 @@ Before merging template changes:
 
 1. Do not introduce new `{{ var }}` placeholders unless context builders provide them.
 2. Keep changes additive where possible.
-3. Review both board-agent and `MAIN_*` templates when changing shared behavior.
+3. Review worker (`DEFAULT_*`), lead (`LEAD_*`), and `MAIN_*` templates when changing shared behavior.
 4. Preserve agent-editable files behavior (`PRESERVE_AGENT_EDITABLE_FILES`).
 5. Run docs quality checks and CI.
 6. Keep heartbeat templates under injected-context size limits (20,000 chars each).
