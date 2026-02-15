@@ -96,7 +96,7 @@ services:
       - -c
       - |
           python -c "from app.services.webhooks.scheduler import bootstrap_webhook_dispatch_schedule; bootstrap_webhook_dispatch_schedule()" && \
-          rqscheduler -u redis://redis:6379/0 -i 60
+          rqscheduler -u "${WEBHOOK_REDIS_URL:-redis://redis:6379/0}" -i 60
     depends_on:
       - redis
       - webhook-worker
