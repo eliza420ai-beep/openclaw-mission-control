@@ -111,10 +111,11 @@ function WebhookCard({
   const trimmedDescription = draftDescription.trim();
   const isDescriptionChanged =
     trimmedDescription !== webhook.description.trim();
-  const isAgentChanged = draftAgentValue !== (webhook.agent_id ?? LEAD_AGENT_VALUE);
+  const isAgentChanged =
+    draftAgentValue !== (webhook.agent_id ?? LEAD_AGENT_VALUE);
   const isChanged = isDescriptionChanged || isAgentChanged;
   const mappedAgent = webhook.agent_id
-    ? agents.find((agent) => agent.id === webhook.agent_id) ?? null
+    ? (agents.find((agent) => agent.id === webhook.agent_id) ?? null)
     : null;
 
   const handleSave = async () => {
@@ -243,7 +244,10 @@ function WebhookCard({
       ) : (
         <>
           <div className="text-sm text-slate-700">
-            <Markdown content={webhook.description || ""} variant="description" />
+            <Markdown
+              content={webhook.description || ""}
+              variant="description"
+            />
           </div>
           <p className="text-xs text-slate-600">
             Recipient: {mappedAgent?.name ?? "Lead agent"}
